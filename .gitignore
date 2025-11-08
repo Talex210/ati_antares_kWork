@@ -3,3 +3,6 @@
 
 # Ignore local text files
 Интеграция ATI.SU с группой в ТГ канал.txt
+
+# Ignore node_modules
+node_modules/
