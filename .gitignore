@@ -1,0 +1,5 @@
+# Ignore Gemini CLI configuration files
+.gemini/
+
+# Ignore local text files
+Интеграция ATI.SU с группой в ТГ канал.txt
