@@ -11,12 +11,10 @@ const dbPath = path.resolve(process.cwd(), 'database.db');
  * Инициализирует базу данных и создает необходимые таблицы, если они не существуют.
  */
 export async function initializeDatabase() {
-  // Включаем подробное логирование для отладки
-  const verboseSqlite = sqlite3.verbose();
-  
+  // Упрощаем инициализацию драйвера, чтобы избежать потенциальных проблем с .verbose()
   const db = await open({
     filename: dbPath,
-    driver: verboseSqlite.Database,
+    driver: sqlite3.Database,
   });
 
   console.log('✅ Подключение к базе данных SQLite установлено.');

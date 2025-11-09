@@ -12,3 +12,7 @@ node_modules/
 
 # Ignore database files
 database.db
+
+# Ignore compiled TypeScript output
+dist/
+*.tsbuildinfo

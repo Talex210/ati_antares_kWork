@@ -2,11 +2,13 @@
 
 import dotenv from 'dotenv';
 import TelegramBot from 'node-telegram-bot-api';
+import { AtiApiService } from './api.js';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const POLLING_INTERVAL = 5 * 60 * 1000; // 5 минут в миллисекундах
 
 if (!token) {
   console.error('Ошибка: Токен Telegram-бота не найден. Проверьте ваш .env файл.');
@@ -17,6 +19,41 @@ if (!token) {
 const bot = new TelegramBot(token, { polling: true });
 
 console.log('✅ Бот успешно запущен и начал слушать обновления...');
+
+// --- Логика опроса API ATI.SU ---
+
+/**
+ * Основная функция для опроса API, получения и обработки загрузок.
+ */
+const pollLoads = async () => {
+  console.log('🔍 Опрашиваем API на предмет новых загрузок...');
+  try {
+    const loads = await AtiApiService.getPublishedLoads();
+    
+    if (loads && loads.length > 0) {
+      console.log(`🚚 Найдено ${loads.length} новых загрузок.`);
+      // TODO: Добавить логику фильтрации и публикации в Telegram
+      console.log(loads);
+    } else {
+      console.log(' новых загрузок не найдено.');
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('❌ Ошибка при опросе API:', error.message);
+    } else {
+      console.error('❌ Неизвестная ошибка при опросе API:', error);
+    }
+  }
+};
+
+// --- Инициализация и запуск ---
+
+// Запускаем первый опрос сразу после старта
+pollLoads();
+
+// Устанавливаем интервал для последующих опросов
+setInterval(pollLoads, POLLING_INTERVAL);
+
 
 // Тестовый обработчик команды /start
 bot.onText(/\/start/, (msg) => {
