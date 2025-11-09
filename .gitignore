@@ -9,3 +9,6 @@ node_modules/
 
 # Ignore .env
 .env
+
+# Ignore database files
+database.db
