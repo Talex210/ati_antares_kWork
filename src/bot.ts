@@ -1,7 +1,7 @@
 // src/bot.ts
 
-import dotenv = require('dotenv');
-import TelegramBot = require('node-telegram-bot-api');
+import dotenv from 'dotenv';
+import TelegramBot from 'node-telegram-bot-api';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -29,4 +29,4 @@ bot.on('polling_error', (error) => {
     console.error(`[Polling Error]: ${error.message}`);
 });
 
-export = bot;
+export default bot;

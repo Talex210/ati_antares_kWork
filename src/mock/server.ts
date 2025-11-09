@@ -1,7 +1,7 @@
 // src/mock/server.ts
 
-import express = require('express');
-import { mockLoads, mockEmployees } = require('./data');
+import express from 'express';
+import { mockLoads, mockEmployees } from './data.js';
 
 const app = express();
 const PORT = 3001;

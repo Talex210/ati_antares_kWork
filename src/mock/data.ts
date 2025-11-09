@@ -4,13 +4,7 @@
  * Имитация ответа от API ATI.SU для эндпоинта /v1.0/loads/published
  * Содержит список опубликованных грузов.
  */
-// src/mock/data.ts
-
-/**
- * Имитация ответа от API ATI.SU для эндпоинта /v1.0/loads/published
- * Содержит список опубликованных грузов.
- */
-const mockLoads = [
+export const mockLoads = [
   {
     id: 43817239,
     title: 'Казань → Москва',
@@ -62,7 +56,7 @@ const mockLoads = [
  * Имитация ответа от API ATI.SU для эндпоинта /v1.2/catalogs/organizations/employees
  * Содержит список сотрудников (логистов).
  */
-const mockEmployees = [
+export const mockEmployees = [
     {
         id: 1123,
         name: 'Анна Петрова',
@@ -82,9 +76,3 @@ const mockEmployees = [
         role: 'Логист',
     }
 ];
-
-module.exports = {
-    mockLoads,
-    mockEmployees,
-};
-
