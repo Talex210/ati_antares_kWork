@@ -1,18 +1,20 @@
 // src/database.ts
 
 import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { open, Database } from 'sqlite';
 import path from 'path';
 
 // Обеспечиваем, чтобы путь к БД был корректным вне зависимости от того, откуда запускается скрипт
 const dbPath = path.resolve(process.cwd(), 'database.db');
+
+export let db: Database | undefined; // Экспортируем экземпляр базы данных
 
 /**
  * Инициализирует базу данных и создает необходимые таблицы, если они не существуют.
  */
 export async function initializeDatabase() {
   // Упрощаем инициализацию драйвера, чтобы избежать потенциальных проблем с .verbose()
-  const db = await open({
+  db = await open({
     filename: dbPath,
     driver: sqlite3.Database,
   });
@@ -59,4 +61,24 @@ export async function initializeDatabase() {
   }
 
   return db;
+}
+
+/**
+ * Получает список ATI ID логистов, находящихся в белом списке.
+ * @returns {Promise<number[]>} Массив ATI ID логистов.
+ */
+export async function getWhitelistedLogisticians(): Promise<number[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  try {
+    const logisticians = await db.all<{ ati_id: number }[]>(
+      'SELECT ati_id FROM whitelisted_logisticians'
+    );
+    return logisticians.map((l: { ati_id: number }) => l.ati_id);
+  } catch (error) {
+    console.error('Ошибка при получении логистов из белого списка:', error);
+    return [];
+  }
 }

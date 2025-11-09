@@ -3,6 +3,7 @@
 import dotenv from 'dotenv';
 import TelegramBot from 'node-telegram-bot-api';
 import { AtiApiService } from './api.js';
+import { getWhitelistedLogisticians } from './database.js'; // Импортируем функцию для получения белого списка
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -32,8 +33,21 @@ const pollLoads = async () => {
     
     if (loads && loads.length > 0) {
       console.log(`🚚 Найдено ${loads.length} новых загрузок.`);
-      // TODO: Добавить логику фильтрации и публикации в Telegram
-      console.log(loads);
+
+      const whitelistedLogisticians = await getWhitelistedLogisticians();
+      console.log(`📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`);
+
+      const filteredLoads = loads.filter((load: any) => 
+        whitelistedLogisticians.includes(load.logistId) // Предполагаем, что у груза есть поле logistId
+      );
+
+      if (filteredLoads.length > 0) {
+        console.log(`✅ Найдено ${filteredLoads.length} грузов от логистов из белого списка.`);
+        // TODO: Добавить логику публикации в Telegram
+        console.log(filteredLoads);
+      } else {
+        console.log('❌ Грузов от логистов из белого списка не найдено.');
+      }
     } else {
       console.log(' новых загрузок не найдено.');
     }
