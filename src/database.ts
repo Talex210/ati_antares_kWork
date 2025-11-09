@@ -82,3 +82,48 @@ export async function getWhitelistedLogisticians(): Promise<number[]> {
     return [];
   }
 }
+
+/**
+ * Проверяет, был ли груз уже опубликован.
+ * @param atiLoadId ID груза ATI.
+ * @returns {Promise<boolean>} true, если груз был опубликован, иначе false.
+ */
+export async function isLoadPublished(atiLoadId: number): Promise<boolean> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return false; // Считаем, что не опубликован, если БД недоступна
+  }
+  try {
+    const result = await db.get<{ ati_load_id: number }>(
+      'SELECT ati_load_id FROM published_loads WHERE ati_load_id = ?',
+      atiLoadId
+    );
+    return !!result;
+  } catch (error) {
+    console.error(`Ошибка при проверке публикации груза ${atiLoadId}:`, error);
+    return false; // В случае ошибки считаем, что не опубликован, чтобы избежать потери груза
+  }
+}
+
+/**
+ * Отмечает груз как опубликованный.
+ * @param atiLoadId ID груза ATI.
+ */
+export async function markLoadAsPublished(atiLoadId: number): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    await db.run(
+      'INSERT INTO published_loads (ati_load_id) VALUES (?)',
+      atiLoadId
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      // Это ожидаемое поведение, если груз уже в базе. Просто игнорируем.
+    } else {
+      console.error(`Ошибка при отметке груза ${atiLoadId} как опубликованного:`, error);
+    }
+  }
+}

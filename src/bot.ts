@@ -3,7 +3,7 @@
 import dotenv from 'dotenv';
 import TelegramBot from 'node-telegram-bot-api';
 import { AtiApiService } from './api.js';
-import { getWhitelistedLogisticians } from './database.js'; // Импортируем функцию для получения белого списка
+import { getWhitelistedLogisticians, isLoadPublished, markLoadAsPublished } from './database.js';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -31,26 +31,51 @@ const pollLoads = async () => {
   try {
     const loads = await AtiApiService.getPublishedLoads();
     
-    if (loads && loads.length > 0) {
-      console.log(`🚚 Найдено ${loads.length} новых загрузок.`);
-
-      const whitelistedLogisticians = await getWhitelistedLogisticians();
-      console.log(`📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`);
-
-      const filteredLoads = loads.filter((load: any) => 
-        whitelistedLogisticians.includes(load.logistId) // Предполагаем, что у груза есть поле logistId
-      );
-
-      if (filteredLoads.length > 0) {
-        console.log(`✅ Найдено ${filteredLoads.length} грузов от логистов из белого списка.`);
-        // TODO: Добавить логику публикации в Telegram
-        console.log(filteredLoads);
-      } else {
-        console.log('❌ Грузов от логистов из белого списка не найдено.');
-      }
-    } else {
+    if (!loads || loads.length === 0) {
       console.log(' новых загрузок не найдено.');
+      return;
     }
+    
+    console.log(`🚚 Найдено ${loads.length} активных загрузок.`);
+
+    const whitelistedLogisticians = await getWhitelistedLogisticians();
+    if (whitelistedLogisticians.length === 0) {
+      console.log('⚠️ Белый список логистов пуст. Пропускаем обработку.');
+      return;
+    }
+    console.log(`📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`);
+
+    const filteredLoads = loads.filter((load: any) => 
+      whitelistedLogisticians.includes(load.logistId) // Предполагаем, что у груза есть поле logistId
+    );
+
+    if (filteredLoads.length === 0) {
+      console.log('❌ Грузов от логистов из белого списка не найдено.');
+      return;
+    }
+    
+    console.log(`✅ Найдено ${filteredLoads.length} грузов от логистов из белого списка.`);
+    
+    let newLoadsFound = 0;
+    for (const load of filteredLoads) {
+      // Предполагаем, что у каждого груза есть уникальный ID в поле `id`
+      const alreadyPublished = await isLoadPublished(load.id);
+      if (!alreadyPublished) {
+        newLoadsFound++;
+        console.log(`✨ Обнаружен новый груз для публикации (ID: ${load.id}).`);
+        
+        // TODO: Настроить логику форматирования сообщения
+        // TODO: Написать функцию для отправки в Telegram
+
+        // Отмечаем груз как опубликованный, чтобы не отправлять его снова
+        await markLoadAsPublished(load.id);
+      }
+    }
+
+    if (newLoadsFound === 0) {
+      console.log('ℹ️ Новых, еще не опубликованных, грузов среди найденных нет.');
+    }
+
   } catch (error) {
     if (error instanceof Error) {
       console.error('❌ Ошибка при опросе API:', error.message);
