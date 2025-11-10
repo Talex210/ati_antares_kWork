@@ -3,7 +3,11 @@
 import dotenv from 'dotenv';
 import TelegramBot from 'node-telegram-bot-api';
 import { AtiApiService } from './api.js';
-import { getWhitelistedLogisticians, isLoadPublished, markLoadAsPublished } from './database.js';
+import {
+  getWhitelistedLogisticians,
+  isLoadPublished,
+  markLoadAsPublished,
+} from './database.js';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -12,9 +16,52 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const POLLING_INTERVAL = 5 * 60 * 1000; // 5 минут в миллисекундах
 
 if (!token) {
-  console.error('Ошибка: Токен Telegram-бота не найден. Проверьте ваш .env файл.');
+  console.error(
+    'Ошибка: Токен Telegram-бота не найден. Проверьте ваш .env файл.',
+  );
   process.exit(1);
 }
+
+// --- Типы данных ---
+
+/**
+ * Описывает структуру объекта груза, получаемого от API.
+ */
+interface Load {
+  id: number;
+  title: string;
+  creator: {
+    id: number;
+    name: string;
+    phone: string;
+  };
+  datePublished: string;
+  price: number;
+  cargoType: string;
+  weight: number;
+  volume: number;
+  route: { from: string; to: string };
+}
+
+// --- Форматирование сообщения ---
+
+/**
+ * Форматирует данные о грузе в сообщение для Telegram.
+ * @param load - Объект с данными о грузе.
+ * @returns Отформатированная строка в Markdown.
+ */
+const formatLoadMessage = (load: Load): string => {
+  const message = [
+    `📍 *Маршрут:* ${load.route.from} → ${load.route.to}`,
+    `🚚 *Тип транспорта:* ${load.cargoType}`,
+    `📦 *Груз:* ${load.weight} т, ${load.volume} м³`,
+    `💰 *Ставка:* ${load.price} ₽`,
+    `👤 *Контакт:* ${load.creator.name}`,
+    `📞 *Телефон:* ${load.creator.phone}`,
+  ].join('\n');
+
+  return message;
+};
 
 // Создаем экземпляр бота
 const bot = new TelegramBot(token, { polling: true });
@@ -29,13 +76,13 @@ console.log('✅ Бот успешно запущен и начал слушат
 const pollLoads = async () => {
   console.log('🔍 Опрашиваем API на предмет новых загрузок...');
   try {
-    const loads = await AtiApiService.getPublishedLoads();
-    
+    const loads: Load[] = await AtiApiService.getPublishedLoads();
+
     if (!loads || loads.length === 0) {
       console.log(' новых загрузок не найдено.');
       return;
     }
-    
+
     console.log(`🚚 Найдено ${loads.length} активных загрузок.`);
 
     const whitelistedLogisticians = await getWhitelistedLogisticians();
@@ -43,28 +90,38 @@ const pollLoads = async () => {
       console.log('⚠️ Белый список логистов пуст. Пропускаем обработку.');
       return;
     }
-    console.log(`📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`);
+    console.log(
+      `📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`,
+    );
 
-    const filteredLoads = loads.filter((load: any) => 
-      whitelistedLogisticians.includes(load.logistId) // Предполагаем, что у груза есть поле logistId
+    const filteredLoads = loads.filter((load: Load) =>
+      whitelistedLogisticians.includes(load.creator.id),
     );
 
     if (filteredLoads.length === 0) {
       console.log('❌ Грузов от логистов из белого списка не найдено.');
       return;
     }
-    
-    console.log(`✅ Найдено ${filteredLoads.length} грузов от логистов из белого списка.`);
-    
+
+    console.log(
+      `✅ Найдено ${filteredLoads.length} грузов от логистов из белого списка.`,
+    );
+
     let newLoadsFound = 0;
     for (const load of filteredLoads) {
       // Предполагаем, что у каждого груза есть уникальный ID в поле `id`
       const alreadyPublished = await isLoadPublished(load.id);
       if (!alreadyPublished) {
         newLoadsFound++;
-        console.log(`✨ Обнаружен новый груз для публикации (ID: ${load.id}).`);
-        
-        // TODO: Настроить логику форматирования сообщения
+        console.log(
+          `✨ Обнаружен новый груз для публикации (ID: ${load.id}).`,
+        );
+
+        const message = formatLoadMessage(load);
+        console.log('--- Сформированное сообщение ---');
+        console.log(message);
+        console.log('-----------------------------');
+
         // TODO: Написать функцию для отправки в Telegram
 
         // Отмечаем груз как опубликованный, чтобы не отправлять его снова
@@ -73,9 +130,10 @@ const pollLoads = async () => {
     }
 
     if (newLoadsFound === 0) {
-      console.log('ℹ️ Новых, еще не опубликованных, грузов среди найденных нет.');
+      console.log(
+        'ℹ️ Новых, еще не опубликованных, грузов среди найденных нет.',
+      );
     }
-
   } catch (error) {
     if (error instanceof Error) {
       console.error('❌ Ошибка при опросе API:', error.message);
@@ -93,16 +151,18 @@ pollLoads();
 // Устанавливаем интервал для последующих опросов
 setInterval(pollLoads, POLLING_INTERVAL);
 
-
 // Тестовый обработчик команды /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, 'Привет! Я бот для публикации грузов с ATI.SU. Я готов к работе!');
+  bot.sendMessage(
+    chatId,
+    'Привет! Я бот для публикации грузов с ATI.SU. Я готов к работе!',
+  );
 });
 
 // Обработка ошибок поллинга
 bot.on('polling_error', (error) => {
-    console.error(`[Polling Error]: ${error.message}`);
+  console.error(`[Polling Error]: ${error.message}`);
 });
 
 export default bot;
