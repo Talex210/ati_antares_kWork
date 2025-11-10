@@ -42,6 +42,17 @@ export async function initializeDatabase() {
   `);
   console.log('Таблица "published_loads" готова.');
 
+  // Создаем таблицу для грузов, ожидающих публикации
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS pending_loads (
+      ati_load_id INTEGER PRIMARY KEY,
+      load_data TEXT NOT NULL,
+      added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Таблица "pending_loads" готова.');
+
+
   // Пример добавления логиста в белый список (для теста, можно закомментировать)
   // В реальном приложении это будет делаться через админ-панель.
   try {
@@ -84,26 +95,36 @@ export async function getWhitelistedLogisticians(): Promise<number[]> {
 }
 
 /**
- * Проверяет, был ли груз уже опубликован.
+ * Проверяет, был ли груз уже обработан (опубликован или находится в очереди).
  * @param atiLoadId ID груза ATI.
- * @returns {Promise<boolean>} true, если груз был опубликован, иначе false.
+ * @returns {Promise<boolean>} true, если груз был обработан, иначе false.
  */
-export async function isLoadPublished(atiLoadId: number): Promise<boolean> {
+export async function isLoadProcessed(atiLoadId: number): Promise<boolean> {
   if (!db) {
     console.error('База данных не инициализирована.');
-    return false; // Считаем, что не опубликован, если БД недоступна
+    return false;
   }
   try {
-    const result = await db.get<{ ati_load_id: number }>(
+    // Проверяем в таблице опубликованных
+    const published = await db.get(
       'SELECT ati_load_id FROM published_loads WHERE ati_load_id = ?',
       atiLoadId
     );
-    return !!result;
+    if (published) {
+      return true;
+    }
+    // Проверяем в таблице ожидающих
+    const pending = await db.get(
+      'SELECT ati_load_id FROM pending_loads WHERE ati_load_id = ?',
+      atiLoadId
+    );
+    return !!pending;
   } catch (error) {
-    console.error(`Ошибка при проверке публикации груза ${atiLoadId}:`, error);
-    return false; // В случае ошибки считаем, что не опубликован, чтобы избежать потери груза
+    console.error(`Ошибка при проверке статуса груза ${atiLoadId}:`, error);
+    return false; // В случае ошибки считаем, что не обработан
   }
 }
+
 
 /**
  * Отмечает груз как опубликованный.
@@ -125,5 +146,67 @@ export async function markLoadAsPublished(atiLoadId: number): Promise<void> {
     } else {
       console.error(`Ошибка при отметке груза ${atiLoadId} как опубликованного:`, error);
     }
+  }
+}
+
+/**
+ * Добавляет груз в список ожидания для публикации.
+ * @param load Объект груза.
+ */
+export async function addPendingLoad(load: any): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    await db.run(
+      'INSERT INTO pending_loads (ati_load_id, load_data) VALUES (?, ?)',
+      load.id,
+      JSON.stringify(load)
+    );
+    console.log(`📥 Груз с ID ${load.id} добавлен в очередь на публикацию.`);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      // Груз уже в очереди, это не ошибка.
+    } else {
+      console.error(`Ошибка при добавлении груза ${load.id} в очередь:`, error);
+    }
+  }
+}
+
+/**
+ * Получает все грузы, ожидающие публикации.
+ * @returns {Promise<any[]>} Массив объектов грузов.
+ */
+export async function getPendingLoads(): Promise<any[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  try {
+    const rows = await db.all<{ load_data: string }[]>(
+      'SELECT load_data FROM pending_loads ORDER BY added_at ASC'
+    );
+    return rows.map(row => JSON.parse(row.load_data));
+  } catch (error) {
+    console.error('Ошибка при получении грузов из очереди:', error);
+    return [];
+  }
+}
+
+/**
+ * Удаляет груз из списка ожидания.
+ * @param atiLoadId ID груза ATI.
+ */
+export async function removePendingLoad(atiLoadId: number): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    await db.run('DELETE FROM pending_loads WHERE ati_load_id = ?', atiLoadId);
+    console.log(`🗑️ Груз с ID ${atiLoadId} удален из очереди.`);
+  } catch (error) {
+    console.error(`Ошибка при удалении груза ${atiLoadId} из очереди:`, error);
   }
 }

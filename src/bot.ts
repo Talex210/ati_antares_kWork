@@ -4,9 +4,9 @@ import dotenv from 'dotenv';
 import TelegramBot from 'node-telegram-bot-api';
 import { AtiApiService } from './api.js';
 import {
+  addPendingLoad,
   getWhitelistedLogisticians,
-  isLoadPublished,
-  markLoadAsPublished,
+  isLoadProcessed,
 } from './database.js';
 
 // Загружаем переменные окружения из .env файла
@@ -27,7 +27,7 @@ if (!token) {
 /**
  * Описывает структуру объекта груза, получаемого от API.
  */
-interface Load {
+export interface Load {
   id: number;
   title: string;
   creator: {
@@ -50,7 +50,7 @@ interface Load {
  * @param load - Объект с данными о грузе.
  * @returns Отформатированная строка в Markdown.
  */
-const formatLoadMessage = (load: Load): string => {
+export const formatLoadMessage = (load: Load): string => {
   const message = [
     `📍 *Маршрут:* ${load.route.from} → ${load.route.to}`,
     `🚚 *Тип транспорта:* ${load.cargoType}`,
@@ -79,7 +79,7 @@ const pollLoads = async () => {
     const loads: Load[] = await AtiApiService.getPublishedLoads();
 
     if (!loads || loads.length === 0) {
-      console.log(' новых загрузок не найдено.');
+      console.log('ℹ️ Новых загрузок не найдено.');
       return;
     }
 
@@ -109,29 +109,17 @@ const pollLoads = async () => {
 
     let newLoadsFound = 0;
     for (const load of filteredLoads) {
-      // Предполагаем, что у каждого груза есть уникальный ID в поле `id`
-      const alreadyPublished = await isLoadPublished(load.id);
-      if (!alreadyPublished) {
+      const alreadyProcessed = await isLoadProcessed(load.id);
+      if (!alreadyProcessed) {
         newLoadsFound++;
-        console.log(
-          `✨ Обнаружен новый груз для публикации (ID: ${load.id}).`,
-        );
-
-        const message = formatLoadMessage(load);
-        console.log('--- Сформированное сообщение ---');
-        console.log(message);
-        console.log('-----------------------------');
-
-        // TODO: Написать функцию для отправки в Telegram
-
-        // Отмечаем груз как опубликованный, чтобы не отправлять его снова
-        await markLoadAsPublished(load.id);
+        // Вместо немедленной публикации, добавляем груз в очередь на модерацию
+        await addPendingLoad(load);
       }
     }
 
     if (newLoadsFound === 0) {
       console.log(
-        'ℹ️ Новых, еще не опубликованных, грузов среди найденных нет.',
+        'ℹ️ Новых, еще не обработанных, грузов среди найденных нет.',
       );
     }
   } catch (error) {
