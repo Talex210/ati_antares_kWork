@@ -167,17 +167,22 @@ export function createApiRouter(bot: TelegramBot) {
   /**
    * POST /api/delete-message
    * Удаляет сообщение в Telegram.
-   * Принимает chatId (обязательно) и messageId (обязательно).
+   * Принимает messageId (обязательно) и chatId (опционально).
+   * Если chatId не указан, используется TELEGRAM_CHAT_ID из .env.
    */
   apiRouter.post('/delete-message', async (req: Request, res: Response) => {
-    const { chatId, messageId } = req.body;
+    const { messageId, chatId } = req.body;
+    const targetChatId = chatId || CHAT_ID;
 
-    if (!chatId || !messageId) {
-      return res.status(400).json({ error: 'Необходимы chatId и messageId.' });
+    if (!messageId) {
+      return res.status(400).json({ error: 'Необходим messageId.' });
+    }
+    if (!targetChatId) {
+      return res.status(500).json({ error: 'chatId не указан ни в запросе, ни в .env файле.' });
     }
 
     try {
-      const success = await deleteTelegramMessage(chatId, messageId);
+      const success = await deleteTelegramMessage(targetChatId, messageId);
       if (success) {
         res.status(200).json({ message: 'Сообщение успешно удалено.' });
       } else {
