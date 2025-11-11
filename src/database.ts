@@ -78,7 +78,7 @@ export async function initializeDatabase() {
  * Получает список ATI ID логистов, находящихся в белом списке.
  * @returns {Promise<number[]>} Массив ATI ID логистов.
  */
-export async function getWhitelistedLogisticians(): Promise<number[]> {
+export async function getWhitelistedLogisticiansIds(): Promise<number[]> {
   if (!db) {
     console.error('База данных не инициализирована.');
     return [];
@@ -89,8 +89,81 @@ export async function getWhitelistedLogisticians(): Promise<number[]> {
     );
     return logisticians.map((l: { ati_id: number }) => l.ati_id);
   } catch (error) {
+    console.error('Ошибка при получении ID логистов из белого списка:', error);
+    return [];
+  }
+}
+
+/**
+ * Определяет тип для логиста из белого списка.
+ */
+export interface WhitelistedLogistician {
+  id: number;
+  ati_id: number;
+  name: string;
+  added_at: string;
+}
+
+
+/**
+ * Получает полный список логистов из белого списка.
+ * @returns {Promise<WhitelistedLogistician[]>} Массив объектов логистов.
+ */
+export async function getWhitelistedLogisticians(): Promise<WhitelistedLogistician[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  try {
+    const logisticians = await db.all<WhitelistedLogistician[]>(
+      'SELECT id, ati_id, name, added_at FROM whitelisted_logisticians ORDER BY added_at DESC'
+    );
+    return logisticians;
+  } catch (error) {
     console.error('Ошибка при получении логистов из белого списка:', error);
     return [];
+  }
+}
+
+/**
+ * Добавляет нового логиста в белый список.
+ * @param atiId ATI ID логиста.
+ * @param name Имя логиста.
+ */
+export async function addWhitelistedLogistician(atiId: number, name: string): Promise<void> {
+  if (!db) {
+    throw new Error('База данных не инициализирована.');
+  }
+  try {
+    await db.run(
+      'INSERT INTO whitelisted_logisticians (ati_id, name) VALUES (?, ?)',
+      atiId,
+      name
+    );
+    console.log(`Логист "${name}" (ATI ID: ${atiId}) добавлен в белый список.`);
+  } catch (error) {
+    console.error(`Ошибка при добавлении логиста ${name}:`, error);
+    throw error; // Пробрасываем ошибку выше для обработки в API
+  }
+}
+
+/**
+ * Удаляет логиста из белого списка по его ID в базе данных.
+ * @param id ID логиста в таблице.
+ */
+export async function deleteWhitelistedLogistician(id: number): Promise<void> {
+  if (!db) {
+    throw new Error('База данных не инициализирована.');
+  }
+  try {
+    const result = await db.run('DELETE FROM whitelisted_logisticians WHERE id = ?', id);
+    if (result.changes === 0) {
+      throw new Error(`Логист с ID ${id} не найден.`);
+    }
+    console.log(`Логист с ID ${id} удален из белого списка.`);
+  } catch (error) {
+    console.error(`Ошибка при удалении логиста с ID ${id}:`, error);
+    throw error; // Пробрасываем ошибку выше
   }
 }
 

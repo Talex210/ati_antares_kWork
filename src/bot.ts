@@ -5,7 +5,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { AtiApiService } from './api.js';
 import {
   addPendingLoad,
-  getWhitelistedLogisticians,
+  getWhitelistedLogisticiansIds,
   isLoadProcessed,
 } from './database.js';
 
@@ -85,17 +85,17 @@ const pollLoads = async () => {
 
     console.log(`🚚 Найдено ${loads.length} активных загрузок.`);
 
-    const whitelistedLogisticians = await getWhitelistedLogisticians();
-    if (whitelistedLogisticians.length === 0) {
+    const whitelistedLogisticiansIds = await getWhitelistedLogisticiansIds();
+    if (whitelistedLogisticiansIds.length === 0) {
       console.log('⚠️ Белый список логистов пуст. Пропускаем обработку.');
       return;
     }
     console.log(
-      `📋 Логисты в белом списке: ${whitelistedLogisticians.join(', ')}`,
+      `📋 ID логистов в белом списке: ${whitelistedLogisticiansIds.join(', ')}`,
     );
 
     const filteredLoads = loads.filter((load: Load) =>
-      whitelistedLogisticians.includes(load.creator.id),
+      whitelistedLogisticiansIds.includes(load.creator.id),
     );
 
     if (filteredLoads.length === 0) {
