@@ -257,13 +257,28 @@ export async function getPendingLoads(): Promise<any[]> {
     return [];
   }
   try {
-    const rows = await db.all<{ load_data: string }[]>(
-      'SELECT load_data FROM pending_loads ORDER BY added_at ASC'
+    const rows = await db.all<{ ati_load_id: number, load_data: string }[]>(
+      'SELECT ati_load_id, load_data FROM pending_loads ORDER BY added_at ASC'
     );
-    return rows.map(row => JSON.parse(row.load_data));
+
+    // Используем reduce для безопасного парсинга каждой строки
+    const loads = rows.reduce((acc, row) => {
+      try {
+        // Пытаемся распарсить данные
+        acc.push(JSON.parse(row.load_data));
+      } catch (e) {
+        // Если парсинг не удался, логируем ошибку и пропускаем эту запись
+        console.error(`[DB_ERROR] Не удалось распарсить JSON для груза с ID: ${row.ati_load_id}. Ошибка:`, e);
+        console.error('[DB_ERROR] Проблемные данные:', row.load_data);
+      }
+      return acc;
+    }, [] as any[]);
+
+    return loads;
   } catch (error) {
-    console.error('Ошибка при получении грузов из очереди:', error);
-    return [];
+    console.error('Ошибка при получении грузов из очереди на уровне БД:', error);
+    // Пробрасываем ошибку, чтобы API вернул статус 500
+    throw error;
   }
 }
 

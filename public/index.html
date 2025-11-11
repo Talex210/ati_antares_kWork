@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Админ-панель</h1>
+
+        <!-- Секция для аутентификации -->
+        <div id="auth-section">
+            <h2>Вход</h2>
+            <input type="password" id="password-input" placeholder="Введите пароль">
+            <button id="login-button">Войти</button>
+        </div>
+
+        <!-- Основной контент, скрыт до аутентификации -->
+        <main id="main-content" style="display: none;">
+            <!-- Раздел управления логистами -->
+            <section id="logisticians-section">
+                <h2>Управление логистами</h2>
+                <div id="logisticians-list">
+                    <!-- Список логистов будет здесь -->
+                </div>
+                <div class="add-logist">
+                    <h3>Добавить логиста</h3>
+                    <input type="number" id="logist-ati-id" placeholder="ATI ID">
+                    <input type="text" id="logist-name" placeholder="Имя">
+                    <button id="add-logist-button">Добавить</button>
+                </div>
+            </section>
+
+            <hr>
+
+            <!-- Раздел грузов на публикацию -->
+            <section id="loads-section">
+                <h2>Грузы на публикацию</h2>
+                <div id="pending-loads-list">
+                    <!-- Список грузов будет здесь -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
