@@ -112,12 +112,13 @@ export function createApiRouter(bot: TelegramBot) {
   /**
    * POST /api/publish
    * Публикует груз в Telegram.
+   * Принимает loadId (обязательно) и topicId (опционально).
    */
   apiRouter.post('/publish', async (req: Request, res: Response) => {
     const { loadId, topicId } = req.body;
 
-    if (!loadId || !topicId) {
-      return res.status(400).json({ error: 'Необходимы loadId и topicId.' });
+    if (!loadId) {
+      return res.status(400).json({ error: 'Необходим loadId.' });
     }
     if (!CHAT_ID) {
         return res.status(500).json({ error: 'TELEGRAM_CHAT_ID не указан в .env файле.' });
@@ -131,16 +132,25 @@ export function createApiRouter(bot: TelegramBot) {
 
       const message = formatLoadMessage(load);
       
-      await bot.sendMessage(CHAT_ID, message, {
-        message_thread_id: topicId,
+      const telegramOptions: TelegramBot.SendMessageOptions = {
         parse_mode: 'Markdown',
-      });
+      };
+
+      // Если topicId предоставлен и является числом, добавляем его в опции
+      if (topicId && typeof topicId === 'number') {
+        telegramOptions.message_thread_id = topicId;
+      }
+
+      await bot.sendMessage(CHAT_ID, message, telegramOptions);
 
       // Перемещаем груз из ожидающих в опубликованные
       await removePendingLoad(loadId);
       await markLoadAsPublished(loadId);
 
-      console.log(`✅ Груз ${loadId} успешно опубликован в топик ${topicId}.`);
+      console.log(`✅ Груз ${loadId} успешно опубликован.`);
+      if (topicId && typeof topicId === 'number') {
+        console.log(`В топик ${topicId}.`);
+      }
       res.status(200).json({ message: 'Груз успешно опубликован.' });
 
     } catch (error) {
