@@ -11,9 +11,8 @@
     "clean": "rd /s /q dist",
     "build": "tsc",
     "start": "node dist/index.js",
-    "start:dev": "nodemon --watch src --ext ts --exec \"npm run build && npm start\"",
-    "start:mock": "nodemon --watch src/mock --ext ts --exec \"node --loader ts-node/esm src/mock/server.ts\"",
-    "start:admin": "nodemon --watch src/admin --ext ts --exec \"node --loader ts-node/esm src/admin/server.ts\""
+    "start:dev": "nodemon --watch src --ext ts --exec \"node --loader ts-node/esm src/index.ts\"",
+    "start:mock": "nodemon --watch src/mock --ext ts --exec \"node --loader ts-node/esm src/mock/server.ts\""
   },
   "repository": {
     "type": "git",

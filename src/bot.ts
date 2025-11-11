@@ -8,72 +8,42 @@ import {
   getWhitelistedLogisticiansIds,
   isLoadProcessed,
 } from './database.js';
+import { Load } from './core/types.js';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const POLLING_INTERVAL = 5 * 60 * 1000; // 5 минут в миллисекундах
 
 if (!token) {
-  console.error(
-    'Ошибка: Токен Telegram-бота не найден. Проверьте ваш .env файл.',
+  throw new Error('Ошибка: Токен Telegram-бота не найден. Проверьте ваш .env файл.');
+}
+
+// --- Инициализация бота ---
+
+// Создаем экземпляр бота, но без polling, так как он будет запускаться из index.ts
+const bot = new TelegramBot(token);
+
+// Тестовый обработчик команды /start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(
+    chatId,
+    'Привет! Я бот для публикации грузов с ATI.SU. Я готов к работе!',
   );
-  process.exit(1);
-}
+});
 
-// --- Типы данных ---
-
-/**
- * Описывает структуру объекта груза, получаемого от API.
- */
-export interface Load {
-  id: number;
-  title: string;
-  creator: {
-    id: number;
-    name: string;
-    phone: string;
-  };
-  datePublished: string;
-  price: number;
-  cargoType: string;
-  weight: number;
-  volume: number;
-  route: { from: string; to: string };
-}
-
-// --- Форматирование сообщения ---
-
-/**
- * Форматирует данные о грузе в сообщение для Telegram.
- * @param load - Объект с данными о грузе.
- * @returns Отформатированная строка в Markdown.
- */
-export const formatLoadMessage = (load: Load): string => {
-  const message = [
-    `📍 *Маршрут:* ${load.route.from} → ${load.route.to}`,
-    `🚚 *Тип транспорта:* ${load.cargoType}`,
-    `📦 *Груз:* ${load.weight} т, ${load.volume} м³`,
-    `💰 *Ставка:* ${load.price} ₽`,
-    `👤 *Контакт:* ${load.creator.name}`,
-    `📞 *Телефон:* ${load.creator.phone}`,
-  ].join('\n');
-
-  return message;
-};
-
-// Создаем экземпляр бота
-const bot = new TelegramBot(token, { polling: true });
-
-console.log('✅ Бот успешно запущен и начал слушать обновления...');
+// Обработка ошибок поллинга
+bot.on('polling_error', (error) => {
+  console.error(`[Polling Error]: ${error.message}`);
+});
 
 // --- Логика опроса API ATI.SU ---
 
 /**
  * Основная функция для опроса API, получения и обработки загрузок.
  */
-const pollLoads = async () => {
+export const pollLoads = async () => {
   console.log('🔍 Опрашиваем API на предмет новых загрузок...');
   try {
     const loads: Load[] = await AtiApiService.getPublishedLoads();
@@ -130,27 +100,5 @@ const pollLoads = async () => {
     }
   }
 };
-
-// --- Инициализация и запуск ---
-
-// Запускаем первый опрос сразу после старта
-pollLoads();
-
-// Устанавливаем интервал для последующих опросов
-setInterval(pollLoads, POLLING_INTERVAL);
-
-// Тестовый обработчик команды /start
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(
-    chatId,
-    'Привет! Я бот для публикации грузов с ATI.SU. Я готов к работе!',
-  );
-});
-
-// Обработка ошибок поллинга
-bot.on('polling_error', (error) => {
-  console.error(`[Polling Error]: ${error.message}`);
-});
 
 export default bot;

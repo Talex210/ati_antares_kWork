@@ -268,6 +268,28 @@ export async function getPendingLoads(): Promise<any[]> {
 }
 
 /**
+ * Получает один груз, ожидающий публикации, по его ID.
+ * @param atiLoadId ID груза ATI.
+ * @returns {Promise<any | null>} Объект груза или null, если не найден.
+ */
+export async function getPendingLoadById(atiLoadId: number): Promise<any | null> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return null;
+  }
+  try {
+    const row = await db.get<{ load_data: string }>(
+      'SELECT load_data FROM pending_loads WHERE ati_load_id = ?',
+      atiLoadId
+    );
+    return row ? JSON.parse(row.load_data) : null;
+  } catch (error) {
+    console.error(`Ошибка при получении груза ${atiLoadId} из очереди:`, error);
+    return null;
+  }
+}
+
+/**
  * Удаляет груз из списка ожидания.
  * @param atiLoadId ID груза ATI.
  */
