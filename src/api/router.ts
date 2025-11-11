@@ -14,6 +14,7 @@ import {
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
+import { deleteTelegramMessage } from '../bot.js'; // Импортируем новую функцию
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -113,6 +114,7 @@ export function createApiRouter(bot: TelegramBot) {
    * POST /api/publish
    * Публикует груз в Telegram.
    * Принимает loadId (обязательно) и topicId (опционально).
+   * Возвращает message_id опубликованного сообщения.
    */
   apiRouter.post('/publish', async (req: Request, res: Response) => {
     const { loadId, topicId } = req.body;
@@ -141,21 +143,49 @@ export function createApiRouter(bot: TelegramBot) {
         telegramOptions.message_thread_id = topicId;
       }
 
-      await bot.sendMessage(CHAT_ID, message, telegramOptions);
+      const sentMessage = await bot.sendMessage(CHAT_ID, message, telegramOptions);
 
       // Перемещаем груз из ожидающих в опубликованные
       await removePendingLoad(loadId);
       await markLoadAsPublished(loadId);
 
-      console.log(`✅ Груз ${loadId} успешно опубликован.`);
+      console.log(`✅ Груз ${loadId} успешно опубликован. Message ID: ${sentMessage.message_id}`);
       if (topicId && typeof topicId === 'number') {
         console.log(`В топик ${topicId}.`);
       }
-      res.status(200).json({ message: 'Груз успешно опубликован.' });
+      res.status(200).json({ 
+        message: 'Груз успешно опубликован.',
+        messageId: sentMessage.message_id 
+      });
 
     } catch (error) {
       console.error('❌ Ошибка при публикации груза:', error);
       res.status(500).json({ error: 'Ошибка сервера при публикации груза.' });
+    }
+  });
+
+  /**
+   * POST /api/delete-message
+   * Удаляет сообщение в Telegram.
+   * Принимает chatId (обязательно) и messageId (обязательно).
+   */
+  apiRouter.post('/delete-message', async (req: Request, res: Response) => {
+    const { chatId, messageId } = req.body;
+
+    if (!chatId || !messageId) {
+      return res.status(400).json({ error: 'Необходимы chatId и messageId.' });
+    }
+
+    try {
+      const success = await deleteTelegramMessage(chatId, messageId);
+      if (success) {
+        res.status(200).json({ message: 'Сообщение успешно удалено.' });
+      } else {
+        res.status(500).json({ error: 'Не удалось удалить сообщение.' });
+      }
+    } catch (error) {
+      console.error('❌ Ошибка при удалении сообщения через API:', error);
+      res.status(500).json({ error: 'Ошибка сервера при удалении сообщения.' });
     }
   });
 
