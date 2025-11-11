@@ -8,6 +8,7 @@ import {
   addWhitelistedLogistician,
   deleteWhitelistedLogistician,
   WhitelistedLogistician,
+  getPendingLoads,
 } from '../database.js';
 
 // Загружаем переменные окружения
@@ -99,6 +100,19 @@ apiRouter.delete('/logisticians/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: error.message });
     }
     res.status(500).json({ error: 'Ошибка сервера при удалении логиста.' });
+  }
+});
+
+/**
+ * GET /api/pending-loads
+ * Получает список всех грузов, ожидающих публикации.
+ */
+apiRouter.get('/pending-loads', async (req: Request, res: Response) => {
+  try {
+    const pendingLoads = await getPendingLoads();
+    res.json(pendingLoads);
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера при получении ожидающих грузов.' });
   }
 });
 
