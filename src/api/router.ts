@@ -194,5 +194,35 @@ export function createApiRouter(bot: TelegramBot) {
     }
   });
 
+  /**
+   * POST /api/reject-load
+   * Отклоняет (удаляет) груз из очереди на публикацию.
+   * Принимает loadId (обязательно).
+   */
+  apiRouter.post('/reject-load', async (req: Request, res: Response) => {
+    const { loadId } = req.body;
+
+    if (!loadId) {
+      return res.status(400).json({ error: 'Необходим loadId.' });
+    }
+
+    try {
+      // Проверяем, существует ли груз, перед удалением
+      const load = await getPendingLoadById(loadId);
+      if (!load) {
+        return res.status(404).json({ error: `Груз с ID ${loadId} не найден в очереди.` });
+      }
+
+      await removePendingLoad(loadId);
+
+      console.log(`🗑️ Груз ${loadId} отклонен и удален из очереди.`);
+      res.status(200).json({ message: 'Груз успешно отклонен.' });
+
+    } catch (error) {
+      console.error('❌ Ошибка при отклонении груза:', error);
+      res.status(500).json({ error: 'Ошибка сервера при отклонении груза.' });
+    }
+  });
+
   return apiRouter;
 }
