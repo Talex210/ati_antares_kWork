@@ -102,7 +102,8 @@ export const pollLoads = async () => {
     );
 
     const filteredLoads = loads.filter((load: Load) =>
-      whitelistedLogisticiansIds.includes(load.creator.id),
+      whitelistedLogisticiansIds.includes(load.ContactId1) ||
+      (load.ContactId2 && whitelistedLogisticiansIds.includes(load.ContactId2)),
     );
 
     if (filteredLoads.length === 0) {
@@ -116,7 +117,9 @@ export const pollLoads = async () => {
 
     let newLoadsFound = 0;
     for (const load of filteredLoads) {
-      const alreadyProcessed = await isLoadProcessed(load.id);
+      // Используем Id (GUID) как уникальный идентификатор
+      const loadId = load.Id;
+      const alreadyProcessed = await isLoadProcessed(loadId);
       if (!alreadyProcessed) {
         newLoadsFound++;
         // Вместо немедленной публикации, добавляем груз в очередь на модерацию

@@ -1,22 +1,22 @@
-import axios from 'axios';
+// src/api.ts
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001'; // Используем переменную окружения или mock-сервер по умолчанию
+import { getPublishedLoads } from './ati_api.js';
+import { Load } from './core/types.js';
 
 /**
  * Сервис для взаимодействия с API ATI.SU.
- * В режиме разработки использует mock-сервер.
+ * Использует реальный ATI API через модуль ati_api.ts
  */
 export const AtiApiService = {
   /**
-   * Получает опубликованные загрузки.
-   * @returns {Promise<any>} Данные о загрузках.
+   * Получает опубликованные загрузки из реального ATI API.
+   * @returns {Promise<Load[]>} Данные о загрузках.
    */
-  async getPublishedLoads() {
+  async getPublishedLoads(): Promise<Load[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/v1.0/loads/published`);
-      return response.data;
+      return await getPublishedLoads();
     } catch (error) {
-      console.error('Ошибка при получении данных из API:', error);
+      console.error('❌ Ошибка при получении данных из ATI API:', error);
       throw error;
     }
   },

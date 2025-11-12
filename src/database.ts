@@ -36,7 +36,7 @@ export async function initializeDatabase() {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS published_loads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      ati_load_id INTEGER NOT NULL UNIQUE,
+      ati_load_id TEXT NOT NULL UNIQUE,
       published_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -45,7 +45,7 @@ export async function initializeDatabase() {
   // Создаем таблицу для грузов, ожидающих публикации
   await db.exec(`
     CREATE TABLE IF NOT EXISTS pending_loads (
-      ati_load_id INTEGER PRIMARY KEY,
+      ati_load_id TEXT PRIMARY KEY,
       load_data TEXT NOT NULL,
       added_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -169,10 +169,10 @@ export async function deleteWhitelistedLogistician(id: number): Promise<void> {
 
 /**
  * Проверяет, был ли груз уже обработан (опубликован или находится в очереди).
- * @param atiLoadId ID груза ATI.
+ * @param atiLoadId ID груза ATI (GUID).
  * @returns {Promise<boolean>} true, если груз был обработан, иначе false.
  */
-export async function isLoadProcessed(atiLoadId: number): Promise<boolean> {
+export async function isLoadProcessed(atiLoadId: string): Promise<boolean> {
   if (!db) {
     console.error('База данных не инициализирована.');
     return false;
@@ -201,9 +201,9 @@ export async function isLoadProcessed(atiLoadId: number): Promise<boolean> {
 
 /**
  * Отмечает груз как опубликованный.
- * @param atiLoadId ID груза ATI.
+ * @param atiLoadId ID груза ATI (GUID).
  */
-export async function markLoadAsPublished(atiLoadId: number): Promise<void> {
+export async function markLoadAsPublished(atiLoadId: string): Promise<void> {
   if (!db) {
     console.error('База данных не инициализирована.');
     return;
@@ -234,15 +234,15 @@ export async function addPendingLoad(load: any): Promise<void> {
   try {
     await db.run(
       'INSERT INTO pending_loads (ati_load_id, load_data) VALUES (?, ?)',
-      load.id,
+      load.Id,
       JSON.stringify(load)
     );
-    console.log(`📥 Груз с ID ${load.id} добавлен в очередь на публикацию.`);
+    console.log(`📥 Груз с ID ${load.Id} добавлен в очередь на публикацию.`);
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       // Груз уже в очереди, это не ошибка.
     } else {
-      console.error(`Ошибка при добавлении груза ${load.id} в очередь:`, error);
+      console.error(`Ошибка при добавлении груза ${load.Id} в очередь:`, error);
     }
   }
 }
@@ -257,7 +257,7 @@ export async function getPendingLoads(): Promise<any[]> {
     return [];
   }
   try {
-    const rows = await db.all<{ ati_load_id: number, load_data: string }[]>(
+    const rows = await db.all<{ ati_load_id: string, load_data: string }[]>(
       'SELECT ati_load_id, load_data FROM pending_loads ORDER BY added_at ASC'
     );
 
@@ -284,10 +284,10 @@ export async function getPendingLoads(): Promise<any[]> {
 
 /**
  * Получает один груз, ожидающий публикации, по его ID.
- * @param atiLoadId ID груза ATI.
+ * @param atiLoadId ID груза ATI (GUID).
  * @returns {Promise<any | null>} Объект груза или null, если не найден.
  */
-export async function getPendingLoadById(atiLoadId: number): Promise<any | null> {
+export async function getPendingLoadById(atiLoadId: string): Promise<any | null> {
   if (!db) {
     console.error('База данных не инициализирована.');
     return null;
@@ -306,9 +306,9 @@ export async function getPendingLoadById(atiLoadId: number): Promise<any | null>
 
 /**
  * Удаляет груз из списка ожидания.
- * @param atiLoadId ID груза ATI.
+ * @param atiLoadId ID груза ATI (GUID).
  */
-export async function removePendingLoad(atiLoadId: number): Promise<void> {
+export async function removePendingLoad(atiLoadId: string): Promise<void> {
   if (!db) {
     console.error('База данных не инициализирована.');
     return;
