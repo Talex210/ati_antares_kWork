@@ -320,3 +320,48 @@ export async function removePendingLoad(atiLoadId: string): Promise<void> {
     console.error(`Ошибка при удалении груза ${atiLoadId} из очереди:`, error);
   }
 }
+
+/**
+ * Удаляет из очереди грузы, которые не соответствуют текущему белому списку логистов.
+ * Используется после удаления логиста из белого списка.
+ */
+export async function cleanupPendingLoads(): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  
+  try {
+    const whitelistedIds = await getWhitelistedLogisticiansIds();
+    
+    if (whitelistedIds.length === 0) {
+      // Если белый список пуст, удаляем все грузы из очереди
+      const result = await db.run('DELETE FROM pending_loads');
+      console.log(`🧹 Белый список пуст. Удалено ${result.changes || 0} грузов из очереди.`);
+      return;
+    }
+    
+    // Получаем все грузы из очереди
+    const pendingLoads = await getPendingLoads();
+    let removedCount = 0;
+    
+    for (const load of pendingLoads) {
+      const isWhitelisted = 
+        whitelistedIds.includes(load.ContactId1) ||
+        (load.ContactId2 && whitelistedIds.includes(load.ContactId2));
+      
+      if (!isWhitelisted) {
+        await removePendingLoad(load.Id);
+        removedCount++;
+      }
+    }
+    
+    if (removedCount > 0) {
+      console.log(`🧹 Удалено ${removedCount} грузов из очереди (логисты не в белом списке).`);
+    } else {
+      console.log('✅ Все грузы в очереди соответствуют белому списку.');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при очистке очереди грузов:', error);
+  }
+}

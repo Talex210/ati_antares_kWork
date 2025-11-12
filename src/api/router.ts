@@ -14,7 +14,7 @@ import {
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
-import { deleteTelegramMessage } from '../bot.js'; // Импортируем новую функцию
+import { deleteTelegramMessage, pollLoads } from '../bot.js';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -60,6 +60,7 @@ export function createApiRouter(bot: TelegramBot) {
   /**
    * POST /api/logisticians
    * Добавляет нового логиста в белый список.
+   * После добавления автоматически запускает пересканирование грузов.
    */
   apiRouter.post('/logisticians', async (req: Request, res: Response) => {
     const { ati_id, name } = req.body;
@@ -68,7 +69,15 @@ export function createApiRouter(bot: TelegramBot) {
     }
     try {
       await addWhitelistedLogistician(ati_id, name);
-      res.status(201).json({ message: 'Логист успешно добавлен.' });
+      
+      // Запускаем пересканирование грузов в фоне
+      pollLoads().catch(error => {
+        console.error('❌ Ошибка при автоматическом пересканировании после добавления логиста:', error);
+      });
+      
+      res.status(201).json({ 
+        message: 'Логист успешно добавлен. Запущено пересканирование грузов.' 
+      });
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
         return res.status(409).json({ error: 'Логист с таким ATI ID уже существует.' });
@@ -80,6 +89,7 @@ export function createApiRouter(bot: TelegramBot) {
   /**
    * DELETE /api/logisticians/:id
    * Удаляет логиста из белого списка по его ID в базе данных.
+   * После удаления автоматически пересканирует грузы (удаляет грузы этого логиста из очереди).
    */
   apiRouter.delete('/logisticians/:id', async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
@@ -88,7 +98,15 @@ export function createApiRouter(bot: TelegramBot) {
     }
     try {
       await deleteWhitelistedLogistician(id);
-      res.status(200).json({ message: 'Логист успешно удален.' });
+      
+      // Запускаем пересканирование грузов в фоне
+      pollLoads().catch(error => {
+        console.error('❌ Ошибка при автоматическом пересканировании после удаления логиста:', error);
+      });
+      
+      res.status(200).json({ 
+        message: 'Логист успешно удален. Запущено пересканирование грузов.' 
+      });
     } catch (error) {
       if (error instanceof Error && error.message.includes('не найден')) {
         return res.status(404).json({ error: error.message });

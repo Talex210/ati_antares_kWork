@@ -7,6 +7,7 @@ import {
   addPendingLoad,
   getWhitelistedLogisticiansIds,
   isLoadProcessed,
+  cleanupPendingLoads,
 } from './database.js';
 import { Load } from './core/types.js';
 
@@ -83,6 +84,9 @@ export const deleteTelegramMessage = async (
 export const pollLoads = async () => {
   console.log('🔍 Опрашиваем API на предмет новых загрузок...');
   try {
+    // Сначала очищаем очередь от грузов, которые больше не соответствуют белому списку
+    await cleanupPendingLoads();
+    
     const loads: Load[] = await AtiApiService.getPublishedLoads();
 
     if (!loads || loads.length === 0) {
@@ -131,6 +135,8 @@ export const pollLoads = async () => {
       console.log(
         'ℹ️ Новых, еще не обработанных, грузов среди найденных нет.',
       );
+    } else {
+      console.log(`✨ Добавлено ${newLoadsFound} новых грузов в очередь на публикацию.`);
     }
   } catch (error) {
     if (error instanceof Error) {

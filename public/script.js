@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logistAtiIdInput = document.getElementById('logist-ati-id');
     const logistNameInput = document.getElementById('logist-name');
     const pendingLoadsList = document.getElementById('pending-loads-list');
+    const refreshLoadsButton = document.getElementById('refresh-loads-button');
 
     // --- Authentication ---
 
@@ -123,13 +124,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            await fetchWithAuth('/api/logisticians', {
+            const result = await fetchWithAuth('/api/logisticians', {
                 method: 'POST',
                 body: JSON.stringify({ ati_id: atiId, name: name })
             });
+            
             logistAtiIdInput.value = '';
             logistNameInput.value = '';
+            
+            // Обновляем список логистов
             await loadLogisticians();
+            
+            // Показываем сообщение
+            alert(result.message || 'Логист добавлен! Грузы будут обновлены автоматически через несколько секунд.');
+            
+            // Обновляем грузы через 3 секунды (даем время серверу пересканировать)
+            setTimeout(async () => {
+                await loadPendingLoads();
+            }, 3000);
         } catch (error) {
             // Error is handled in fetchWithAuth
         }
@@ -140,10 +152,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const logistId = event.target.dataset.id;
             if (confirm(`Вы уверены, что хотите удалить этого логиста?`)) {
                 try {
-                    await fetchWithAuth(`/api/logisticians/${logistId}`, {
+                    const result = await fetchWithAuth(`/api/logisticians/${logistId}`, {
                         method: 'DELETE'
                     });
+                    
+                    // Обновляем список логистов
                     await loadLogisticians();
+                    
+                    // Показываем сообщение
+                    alert(result.message || 'Логист удален! Грузы будут обновлены автоматически через несколько секунд.');
+                    
+                    // Обновляем грузы через 3 секунды (даем время серверу очистить очередь)
+                    setTimeout(async () => {
+                        await loadPendingLoads();
+                    }, 3000);
                 } catch (error) {
                     // Error is handled in fetchWithAuth
                 }
@@ -240,6 +262,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Error is handled in fetchWithAuth
                 }
             }
+        }
+    });
+
+    // --- Manual Refresh Button ---
+    refreshLoadsButton.addEventListener('click', async () => {
+        refreshLoadsButton.disabled = true;
+        refreshLoadsButton.textContent = '⏳ Обновление...';
+        try {
+            await loadPendingLoads();
+        } finally {
+            refreshLoadsButton.disabled = false;
+            refreshLoadsButton.textContent = '🔄 Обновить';
         }
     });
 
