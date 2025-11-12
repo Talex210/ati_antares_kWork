@@ -220,22 +220,23 @@ document.addEventListener('DOMContentLoaded', () => {
         // Функция для получения строки даты
         function getDateString(load) {
             if (load.DateType === 0) {
-                return `📅 ${formatDate(load.FirstDate)}`;
+                return `📅 Дата: ${formatDate(load.FirstDate)}`;
             } else if (load.DateType === 1) {
-                return `📅 ${formatDate(load.FirstDate)} - ${formatDate(load.LastDate)}`;
+                return `📅 Дата: ${formatDate(load.FirstDate)} - ${formatDate(load.LastDate)}`;
             } else if (load.DateType === 2) {
-                return '📅 Постоянно';
+                return '📅 Дата: Постоянно';
             } else if (load.DateType === 3) {
-                return '📅 Запрос ставки';
+                return '📅 Дата: Запрос ставки';
             }
-            return '📅 н/д';
+            return '📅 Дата: н/д';
         }
 
         // Функция для получения маршрута
         function getRoute(load) {
             const from = load.Loading?.CityId || 'н/д';
             const to = load.Unloading?.CityId || 'н/д';
-            return `📍 ${from} → ${to}`;
+            const distance = load.Distance ? ` (${load.Distance} км)` : '';
+            return `📍 Маршрут: ${from} → ${to}${distance}`;
         }
 
         // Функция для получения характера груза
@@ -243,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = load.Cargo?.CargoType || 'Груз';
             const weight = load.Cargo?.Weight || 0;
             const volume = load.Cargo?.Volume || 0;
-            return `📦 ${type} - ${weight} т / ${volume} м³`;
+            return `📦 Характер груза: ${type} - ${weight} т / ${volume} м³`;
         }
 
         // Функция для получения транспорта
@@ -255,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             const carType = carTypes[load.Transport?.CarType] || 'Не указан';
             const qty = load.Transport?.TrucksQuantity || 1;
-            return `🚛 ${carType}${qty > 1 ? ` x${qty}` : ''}`;
+            return `🚛 Транспорт: ${carType}${qty > 1 ? ` x${qty}` : ''}`;
         }
 
         // Функция для получения ставки
@@ -276,12 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 price += ' (торг)';
             }
             
-            return `💰 ${price}`;
+            return `💰 Ставка: ${price}`;
         }
 
         // Функция для получения контактов
         function getContact(load) {
-            return `👤 Контакт ID: ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
+            return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
         }
 
         pendingLoadsList.innerHTML = loads.map(load => `
