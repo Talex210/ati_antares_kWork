@@ -52,25 +52,6 @@ export async function initializeDatabase() {
   `);
   console.log('Таблица "pending_loads" готова.');
 
-
-  // Пример добавления логиста в белый список (для теста, можно закомментировать)
-  // В реальном приложении это будет делаться через админ-панель.
-  try {
-    await db.run(
-      'INSERT INTO whitelisted_logisticians (ati_id, name) VALUES (?, ?)',
-      1123, // ID Анны Петровой из mock-данных
-      'Анна Петрова'
-    );
-    console.log('Тестовый логист "Анна Петрова" добавлен в белый список.');
-  } catch (error) {
-    // Игнорируем ошибку, если логист уже существует (UNIQUE constraint failed)
-    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
-        console.log('Тестовый логист "Анна Петрова" уже в белом списке.');
-    } else {
-        console.error('Ошибка при добавлении тестового логиста:', error);
-    }
-  }
-
   return db;
 }
 

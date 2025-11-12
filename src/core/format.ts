@@ -3,6 +3,16 @@
 import { Load } from './types.js';
 
 /**
+ * Справочник контактов логистов
+ * TODO: В будущем получать из API или базы данных
+ */
+const CONTACTS_MAP: Record<number, { phone: string; telegram: string; name: string }> = {
+  // Добавь сюда реальные ContactId из ATI
+  // Пример:
+  // 12345: { phone: '+7 (987) 213-52-80', telegram: '@sergey_antares116', name: 'Сергей' },
+};
+
+/**
  * Словарь типов готовности груза
  */
 const DATE_TYPES: Record<number, string> = {
@@ -24,6 +34,22 @@ const CURRENCIES: Record<number, string> = {
 };
 
 /**
+ * Словарь типов транспорта (примерные значения)
+ */
+const CAR_TYPES: Record<number, string> = {
+  1: 'Тент',
+  2: 'Реф',
+  3: 'Изотерм',
+  4: 'Бортовой',
+  5: 'Контейнеровоз',
+  6: 'Автовоз',
+  7: 'Цистерна',
+  8: 'Самосвал',
+  9: 'Низкорамник',
+  10: 'Фургон',
+};
+
+/**
  * Форматирует дату в читаемый вид
  */
 function formatDate(dateString: string): string {
@@ -40,102 +66,146 @@ function formatDate(dateString: string): string {
 }
 
 /**
+ * Получает контактную информацию по ContactId
+ */
+function getContactInfo(contactId: number): { phone: string; telegram: string; name: string } {
+  return CONTACTS_MAP[contactId] || {
+    phone: 'Не указан',
+    telegram: '',
+    name: `Контакт ${contactId}`,
+  };
+}
+
+/**
+ * Форматирует дату и время для отображения
+ */
+function formatDateTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+/**
  * Форматирует данные о грузе в сообщение для Telegram.
+ * Формат: Дата | Маршрут | Характер груза | Транспорт | Ставка | Контакты
  * @param load - Объект с данными о грузе от ATI API.
  * @returns Отформатированная строка в Markdown.
  */
 export const formatLoadMessage = (load: Load): string => {
   const lines: string[] = [];
   
-  // Заголовок
-  lines.push(`🚚 *ГРУЗ №${load.LoadNumber || load.Id}*`);
-  lines.push('━━━━━━━━━━━━━━━━━━━━');
-  
-  // Маршрут
-  const fromCity = load.Loading?.CityId ? `Город ID: ${load.Loading.CityId}` : 'Не указан';
-  const toCity = load.Unloading?.CityId ? `Город ID: ${load.Unloading.CityId}` : 'Не указан';
-  lines.push(`📍 *Маршрут:* ${fromCity} → ${toCity}`);
-  
-  // Адреса (если есть)
-  if (load.Loading?.Street) {
-    lines.push(`   Загрузка: ${load.Loading.Street}`);
+  // 1. ДАТА
+  let dateStr = '';
+  if (load.DateType === 0) {
+    // Готов к загрузке
+    dateStr = `📅 *Дата:* ${formatDateTime(load.FirstDate)}`;
+  } else if (load.DateType === 1) {
+    // С даты по дату
+    dateStr = `📅 *Дата:* ${formatDateTime(load.FirstDate)} - ${formatDateTime(load.LastDate)}`;
+  } else if (load.DateType === 2) {
+    // Постоянно
+    dateStr = '📅 *Дата:* Постоянно';
+  } else if (load.DateType === 3) {
+    // Груза нет, запрос ставки
+    dateStr = '📅 *Дата:* Запрос ставки';
   }
-  if (load.Unloading?.Street) {
-    lines.push(`   Разгрузка: ${load.Unloading.Street}`);
-  }
+  lines.push(dateStr);
   
-  // Расстояние
+  // 2. МАРШРУТ
+  const fromCity = load.Loading?.CityId || 'н/д';
+  const toCity = load.Unloading?.CityId || 'н/д';
+  const fromStreet = load.Loading?.Street ? ` (${load.Loading.Street})` : '';
+  const toStreet = load.Unloading?.Street ? ` (${load.Unloading.Street})` : '';
+  
+  lines.push(`📍 *Маршрут:* ${fromCity}${fromStreet} → ${toCity}${toStreet}`);
+  
   if (load.Distance) {
-    lines.push(`🛣 *Расстояние:* ${load.Distance} км`);
+    lines.push(`   🛣 Расстояние: ${load.Distance} км`);
   }
   
-  lines.push(''); // Пустая строка
+  // 3. ХАРАКТЕР ГРУЗА
+  const weight = load.Cargo?.Weight || 0;
+  const volume = load.Cargo?.Volume || 0;
+  const cargoType = load.Cargo?.CargoType || 'Груз';
   
-  // Информация о грузе
-  if (load.Cargo) {
-    lines.push(`📦 *Груз:* ${load.Cargo.Weight || 0} т, ${load.Cargo.Volume || 0} м³`);
-    if (load.Cargo.CargoType) {
-      lines.push(`   Тип: ${load.Cargo.CargoType}`);
-    }
+  lines.push(`📦 *Характер груза:* ${cargoType} - ${weight} т / ${volume} м³`);
+  
+  // Примечание к грузу (если есть)
+  if (load.Note && load.Note.length < 100) {
+    lines.push(`   💬 ${load.Note}`);
   }
   
-  // Даты
-  const dateType = DATE_TYPES[load.DateType] || 'Не указано';
-  lines.push(`📅 *Готовность:* ${dateType}`);
+  // 4. ТРАНСПОРТ
+  const carType = CAR_TYPES[load.Transport?.CarType || 1] || 'Не указан';
+  const trucksQty = load.Transport?.TrucksQuantity || 1;
   
-  if (load.FirstDate) {
-    lines.push(`   С: ${formatDate(load.FirstDate)}`);
-  }
-  if (load.LastDate && load.DateType !== 3) {
-    lines.push(`   До: ${formatDate(load.LastDate)}`);
+  let transportStr = `🚛 *Транспорт:* ${carType}`;
+  if (trucksQty > 1) {
+    transportStr += ` x${trucksQty}`;
   }
   
-  lines.push(''); // Пустая строка
-  
-  // Оплата
-  if (load.Payment) {
-    const currency = CURRENCIES[load.Payment.CurrencyId] || '';
-    
-    if (load.Payment.RateSum) {
-      lines.push(`💰 *Ставка:* ${load.Payment.RateSum} ${currency}`);
-    } else if (load.Payment.SumWithoutNDS) {
-      lines.push(`💰 *Сумма:* ${load.Payment.SumWithoutNDS} ${currency} (без НДС)`);
-    } else if (load.Payment.SumWithNDS) {
-      lines.push(`💰 *Сумма:* ${load.Payment.SumWithNDS} ${currency} (с НДС)`);
-    }
-    
-    if (load.Payment.Torg) {
-      lines.push('   💬 Торг возможен');
-    }
-    
-    if (load.Payment.PrepayPercent) {
-      lines.push(`   💳 Предоплата: ${load.Payment.PrepayPercent}%`);
-    }
+  // Температурный режим
+  if (load.Transport?.TemperatureFrom !== undefined || load.Transport?.TemperatureTo !== undefined) {
+    const tempFrom = load.Transport.TemperatureFrom || 0;
+    const tempTo = load.Transport.TemperatureTo || 0;
+    transportStr += ` 🌡 ${tempFrom}°C...${tempTo}°C`;
   }
   
-  // Озвученная ставка (если есть)
-  if (load.TruePrice) {
-    const trueCurrency = CURRENCIES[load.TrueCurrencyId || 1] || '';
-    lines.push(`✅ *Озвученная ставка:* ${load.TruePrice} ${trueCurrency}`);
+  lines.push(transportStr);
+  
+  // 5. СТАВКА
+  const currency = CURRENCIES[load.Payment?.CurrencyId || 1] || '₽';
+  let priceStr = '💰 *Ставка:* ';
+  
+  if (load.Payment?.RateSum) {
+    priceStr += `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
+  } else if (load.Payment?.SumWithoutNDS) {
+    priceStr += `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
+  } else if (load.TruePrice) {
+    priceStr += `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
+  } else {
+    priceStr += 'По договоренности';
   }
   
-  // Примечание
-  if (load.Note) {
-    lines.push('');
-    lines.push(`📝 *Примечание:*`);
-    lines.push(load.Note);
+  // Торг
+  if (load.Payment?.Torg) {
+    priceStr += ' (торг)';
   }
   
-  // Контакты
+  // Предоплата
+  if (load.Payment?.PrepayPercent) {
+    priceStr += ` | Предоплата ${load.Payment.PrepayPercent}%`;
+  }
+  
+  lines.push(priceStr);
+  
+  // 6. КОНТАКТЫ
   lines.push('');
-  lines.push(`👤 *Контакт ID:* ${load.ContactId1}`);
-  if (load.ContactId2) {
-    lines.push(`👤 *Контакт 2 ID:* ${load.ContactId2}`);
+  lines.push('👤 *Контакты:*');
+  
+  const contact = getContactInfo(load.ContactId1);
+  lines.push(`   ${contact.name}`);
+  lines.push(`   📞 ${contact.phone}`);
+  
+  if (contact.telegram) {
+    lines.push(`   💬 ${contact.telegram}`);
   }
   
-  // Дата добавления
-  if (load.AddedAt) {
-    lines.push(`🕐 *Добавлено:* ${formatDate(load.AddedAt)}`);
+  // Если есть второй контакт
+  if (load.ContactId2) {
+    const contact2 = getContactInfo(load.ContactId2);
+    lines.push('');
+    lines.push(`   ${contact2.name}`);
+    lines.push(`   📞 ${contact2.phone}`);
+    if (contact2.telegram) {
+      lines.push(`   💬 ${contact2.telegram}`);
+    }
   }
   
   return lines.join('\n');

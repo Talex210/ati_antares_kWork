@@ -206,12 +206,93 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 111, name: 'Международные загрузки' }
         ];
 
+        // Функция для форматирования даты
+        function formatDate(dateString) {
+            if (!dateString) return 'н/д';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            } catch {
+                return 'н/д';
+            }
+        }
+
+        // Функция для получения строки даты
+        function getDateString(load) {
+            if (load.DateType === 0) {
+                return `📅 ${formatDate(load.FirstDate)}`;
+            } else if (load.DateType === 1) {
+                return `📅 ${formatDate(load.FirstDate)} - ${formatDate(load.LastDate)}`;
+            } else if (load.DateType === 2) {
+                return '📅 Постоянно';
+            } else if (load.DateType === 3) {
+                return '📅 Запрос ставки';
+            }
+            return '📅 н/д';
+        }
+
+        // Функция для получения маршрута
+        function getRoute(load) {
+            const from = load.Loading?.CityId || 'н/д';
+            const to = load.Unloading?.CityId || 'н/д';
+            return `📍 ${from} → ${to}`;
+        }
+
+        // Функция для получения характера груза
+        function getCargo(load) {
+            const type = load.Cargo?.CargoType || 'Груз';
+            const weight = load.Cargo?.Weight || 0;
+            const volume = load.Cargo?.Volume || 0;
+            return `📦 ${type} - ${weight} т / ${volume} м³`;
+        }
+
+        // Функция для получения транспорта
+        function getTransport(load) {
+            const carTypes = {
+                1: 'Тент', 2: 'Реф', 3: 'Изотерм', 4: 'Бортовой',
+                5: 'Контейнеровоз', 6: 'Автовоз', 7: 'Цистерна',
+                8: 'Самосвал', 9: 'Низкорамник', 10: 'Фургон'
+            };
+            const carType = carTypes[load.Transport?.CarType] || 'Не указан';
+            const qty = load.Transport?.TrucksQuantity || 1;
+            return `🚛 ${carType}${qty > 1 ? ` x${qty}` : ''}`;
+        }
+
+        // Функция для получения ставки
+        function getPrice(load) {
+            const currencies = { 1: '₽', 2: '$', 3: '€', 4: '₴', 5: '₸' };
+            const currency = currencies[load.Payment?.CurrencyId] || '₽';
+            
+            let price = 'По договоренности';
+            if (load.Payment?.RateSum) {
+                price = `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
+            } else if (load.Payment?.SumWithoutNDS) {
+                price = `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
+            } else if (load.TruePrice) {
+                price = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
+            }
+            
+            if (load.Payment?.Torg) {
+                price += ' (торг)';
+            }
+            
+            return `💰 ${price}`;
+        }
+
+        // Функция для получения контактов
+        function getContact(load) {
+            return `👤 Контакт ID: ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
+        }
+
         pendingLoadsList.innerHTML = loads.map(load => `
-            <div class="load-card" data-load-id="${load.id}">
+            <div class="load-card" data-load-id="${load.Id}">
                 <div class="load-details">
-                    <p><strong>Маршрут:</strong> ${load.route?.from || 'Неизвестно'} → ${load.route?.to || 'Неизвестно'}</p>
-                    <p><strong>Груз:</strong> ${load.cargoType || 'Тип груза не указан'}</p>
-                    <p><strong>Ставка:</strong> ${load.price ? `${load.price} ₽` : 'По запросу'}</p>
+                    <p>${getDateString(load)}</p>
+                    <p><strong>${getRoute(load)}</strong></p>
+                    <p>${getCargo(load)}</p>
+                    <p>${getTransport(load)}</p>
+                    <p><strong>${getPrice(load)}</strong></p>
+                    <p style="color: #666; font-size: 0.9em;">${getContact(load)}</p>
                 </div>
                 <div class="load-actions">
                     <select class="topic-select">
@@ -229,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadCard = target.closest('.load-card');
         if (!loadCard) return;
 
-        const loadId = parseInt(loadCard.dataset.loadId, 10);
+        const loadId = loadCard.dataset.loadId; // Теперь это GUID (строка), не число
 
         if (target.classList.contains('publish-btn')) {
             const topicSelect = loadCard.querySelector('.topic-select');
