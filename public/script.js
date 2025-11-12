@@ -170,11 +170,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // TODO: Заменить на динамический список топиков
         const topics = [
-            { id: 1, name: 'Общий' },
-            { id: 13, name: 'РЭФ' },
-            { id: 14, name: 'ТЕНТ' },
+            { id: null, name: 'General' },
+            { id: 115, name: 'Загрузки вся РФ' },
+            { id: 107, name: 'Загрузки из Владивостока' },
+            { id: 105, name: 'Загрузки из Екатеринбурга' },
+            { id: 101, name: 'Загрузки из Казани' },
+            { id: 103, name: 'Загрузки из Москвы и МО' },
+            { id: 244, name: 'Загрузки из Набережных Челнов' },
+            { id: 113, name: 'Загрузки НЕГАБАРИТ' },
+            { id: 109, name: 'Загрузки из Самары' },
+            { id: 117, name: 'Курилка' },
+            { id: 111, name: 'Международные загрузки' }
         ];
 
         pendingLoadsList.innerHTML = loads.map(load => `
