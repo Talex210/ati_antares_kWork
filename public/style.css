@@ -228,6 +228,14 @@ body {
     border-color: #667eea;
 }
 
+.form-group input:invalid:not(:placeholder-shown) {
+    border-color: #dc3545;
+}
+
+.form-group input:valid:not(:placeholder-shown) {
+    border-color: #28a745;
+}
+
 /* Контейнер списка */
 .list-container {
     background: white;

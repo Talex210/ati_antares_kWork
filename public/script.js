@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Логисты
     const logisticiansList = document.getElementById('logisticians-list');
     const addLogistButton = document.getElementById('add-logist-button');
-    const logistAtiIdInput = document.getElementById('logist-ati-id');
-    const logistNameInput = document.getElementById('logist-name');
+    const logistPhoneInput = document.getElementById('logist-phone');
+    const logistTelegramInput = document.getElementById('logist-telegram');
     const updateContactsButton = document.getElementById('update-contacts-button');
     
     // Грузы на публикацию
@@ -160,28 +160,96 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    addLogistButton.addEventListener('click', async () => {
-        const atiId = parseInt(logistAtiIdInput.value, 10);
-        const name = logistNameInput.value.trim();
+    // Валидация Telegram-ника
+    function validateTelegram(telegram) {
+        // Проверяем, что начинается с @
+        if (!telegram.startsWith('@')) {
+            return { valid: false, message: 'Telegram-ник должен начинаться с @' };
+        }
+        
+        // Убираем @ для проверки username
+        const username = telegram.slice(1);
+        
+        // Проверяем длину (минимум 5 символов)
+        if (username.length < 5) {
+            return { valid: false, message: 'Telegram-ник должен содержать минимум 5 символов после @' };
+        }
+        
+        // Проверяем допустимые символы (только буквы, цифры и подчеркивание)
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            return { valid: false, message: 'Telegram-ник может содержать только буквы, цифры и подчеркивание' };
+        }
+        
+        // Проверяем, что не начинается с цифры
+        if (/^\d/.test(username)) {
+            return { valid: false, message: 'Telegram-ник не может начинаться с цифры после @' };
+        }
+        
+        return { valid: true, message: '' };
+    }
 
-        if (!atiId || !name) {
-            alert('Пожалуйста, заполните оба поля: ATI ID и Имя.');
+    // Валидация полей для активации кнопки
+    function validateLogistForm() {
+        const phone = logistPhoneInput.value.trim();
+        const telegram = logistTelegramInput.value.trim();
+        
+        // Визуальная индикация валидности Telegram
+        if (telegram) {
+            const validation = validateTelegram(telegram);
+            if (validation.valid) {
+                logistTelegramInput.style.borderColor = '#28a745';
+            } else {
+                logistTelegramInput.style.borderColor = '#dc3545';
+            }
+        } else {
+            logistTelegramInput.style.borderColor = '';
+        }
+        
+        addLogistButton.disabled = !phone || !telegram;
+    }
+
+    logistPhoneInput.addEventListener('input', validateLogistForm);
+    logistTelegramInput.addEventListener('input', validateLogistForm);
+
+    addLogistButton.addEventListener('click', async () => {
+        const phone = logistPhoneInput.value.trim();
+        const telegram = logistTelegramInput.value.trim();
+
+        // Проверка заполненности полей
+        if (!phone || !telegram) {
+            alert('❌ Ошибка: Пожалуйста, заполните оба поля!\n\n• Номер телефона\n• Telegram-ник');
+            return;
+        }
+
+        // Валидация Telegram-ника
+        const telegramValidation = validateTelegram(telegram);
+        if (!telegramValidation.valid) {
+            alert(`❌ Ошибка: ${telegramValidation.message}\n\nПример правильного формата: @username`);
+            logistTelegramInput.focus();
             return;
         }
 
         try {
-            const result = await fetchWithAuth('/api/logisticians', {
+            addLogistButton.disabled = true;
+            addLogistButton.textContent = '⏳ Добавление...';
+
+            const result = await fetchWithAuth('/api/logisticians/add-by-phone', {
                 method: 'POST',
-                body: JSON.stringify({ ati_id: atiId, name: name })
+                body: JSON.stringify({ phone: phone, telegram: telegram })
             });
             
-            logistAtiIdInput.value = '';
-            logistNameInput.value = '';
+            logistPhoneInput.value = '';
+            logistTelegramInput.value = '';
+            logistTelegramInput.style.borderColor = '';
+            validateLogistForm();
             
             await loadLogisticians();
             alert(result.message || 'Логист добавлен!');
         } catch (error) {
             // Error is handled in fetchWithAuth
+        } finally {
+            addLogistButton.textContent = 'Добавить';
+            validateLogistForm();
         }
     });
 

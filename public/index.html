@@ -41,11 +41,17 @@
                 
                 <div class="add-form">
                     <h3>➕ Добавить логиста</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                        Введите номер телефона логиста и его Telegram-ник. Система автоматически найдет контакт в ATI.
+                    </p>
                     <div class="form-group">
-                        <input type="number" id="logist-ati-id" placeholder="ATI ID" required>
-                        <input type="text" id="logist-name" placeholder="Имя логиста" required>
-                        <button id="add-logist-button" class="btn-primary">Добавить</button>
+                        <input type="tel" id="logist-phone" placeholder="Номер телефона (например: +7 927 123-45-67)" required>
+                        <input type="text" id="logist-telegram" placeholder="Telegram (например: @username)" required pattern="@[a-zA-Z][a-zA-Z0-9_]{4,}">
+                        <button id="add-logist-button" class="btn-primary" disabled>Добавить</button>
                     </div>
+                    <p style="color: #999; font-size: 12px; margin-top: 10px;">
+                        ℹ️ Telegram-ник должен начинаться с @ и содержать минимум 5 символов (буквы, цифры, подчеркивание)
+                    </p>
                 </div>
 
                 <div class="list-container">

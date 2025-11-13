@@ -107,6 +107,62 @@ export function createApiRouter(bot: TelegramBot) {
   });
 
   /**
+   * POST /api/logisticians/add-by-phone
+   * Добавляет логиста по номеру телефона.
+   * Ищет контакт в ATI API по телефону и добавляет с указанным Telegram.
+   */
+  apiRouter.post('/logisticians/add-by-phone', async (req: Request, res: Response) => {
+    const { phone, telegram } = req.body;
+    
+    if (!phone || !telegram || typeof phone !== 'string' || typeof telegram !== 'string') {
+      return res.status(400).json({ error: 'Неверный формат данных. Ожидается { phone: string, telegram: string }.' });
+    }
+
+    try {
+      const { getContacts } = await import('../ati_api.js');
+      const contacts = await getContacts();
+      
+      // Нормализуем номер телефона (убираем все кроме цифр)
+      const normalizePhone = (p: string) => p.replace(/\D/g, '');
+      const normalizedPhone = normalizePhone(phone);
+      
+      // Ищем контакт по номеру телефона
+      const contact = contacts.find(c => {
+        const contactPhone = normalizePhone(c.phone || '');
+        const contactMobile = normalizePhone(c.mobile || '');
+        return contactPhone === normalizedPhone || contactMobile === normalizedPhone;
+      });
+
+      if (!contact) {
+        return res.status(404).json({ error: 'Контакт с таким номером телефона не найден в ATI.' });
+      }
+
+      // Добавляем логиста
+      await addWhitelistedLogistician(
+        contact.id,
+        contact.name || `Контакт ${contact.id}`,
+        contact.mobile || contact.phone || undefined,
+        telegram
+      );
+      
+      // Запускаем пересканирование грузов в фоне
+      pollLoads().catch(error => {
+        console.error('❌ Ошибка при автоматическом пересканировании после добавления логиста:', error);
+      });
+      
+      res.status(201).json({ 
+        message: `Логист ${contact.name} успешно добавлен. Запущено пересканирование грузов.` 
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Логист с таким номером телефона уже существует в белом списке.' });
+      }
+      console.error('❌ Ошибка при добавлении логиста по телефону:', error);
+      res.status(500).json({ error: 'Ошибка сервера при добавлении логиста.' });
+    }
+  });
+
+  /**
    * DELETE /api/logisticians/:id
    * Удаляет логиста из белого списка по его ID в базе данных.
    * После удаления автоматически пересканирует грузы (удаляет грузы этого логиста из очереди).
