@@ -3,46 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админ-панель</title>
+    <title>Админ-панель ATI</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Админ-панель</h1>
-
-        <!-- Секция для аутентификации -->
-        <div id="auth-section">
-            <h2>Вход</h2>
+    <!-- Секция для аутентификации -->
+    <div id="auth-section">
+        <div class="auth-container">
+            <h1>🔐 Вход в админ-панель</h1>
             <input type="password" id="password-input" placeholder="Введите пароль">
             <button id="login-button">Войти</button>
         </div>
+    </div>
 
-        <!-- Основной контент, скрыт до аутентификации -->
-        <main id="main-content" style="display: none;">
-            <!-- Раздел управления логистами -->
-            <section id="logisticians-section">
-                <h2>Управление логистами</h2>
-                <div id="logisticians-list">
-                    <!-- Список логистов будет здесь -->
+    <!-- Основной контент, скрыт до аутентификации -->
+    <div id="main-content" style="display: none;">
+        <!-- Шапка с вкладками -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📦 Админ-панель ATI</h1>
+                <nav class="tabs">
+                    <button class="tab-button active" data-tab="logisticians">👥 Управление логистами</button>
+                    <button class="tab-button" data-tab="pending">📋 Грузы на публикацию</button>
+                    <button class="tab-button" data-tab="rejected">🗑️ Отклоненные грузы</button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Контент вкладок -->
+        <main class="main-container">
+            <!-- Вкладка: Управление логистами -->
+            <section id="tab-logisticians" class="tab-content active">
+                <div class="section-header">
+                    <h2>👥 Управление логистами</h2>
+                    <p class="section-description">Добавляйте и удаляйте логистов из белого списка</p>
                 </div>
-                <div class="add-logist">
-                    <h3>Добавить логиста</h3>
-                    <input type="number" id="logist-ati-id" placeholder="ATI ID">
-                    <input type="text" id="logist-name" placeholder="Имя">
-                    <button id="add-logist-button">Добавить</button>
+                
+                <div class="add-form">
+                    <h3>➕ Добавить логиста</h3>
+                    <div class="form-group">
+                        <input type="number" id="logist-ati-id" placeholder="ATI ID" required>
+                        <input type="text" id="logist-name" placeholder="Имя логиста" required>
+                        <button id="add-logist-button" class="btn-primary">Добавить</button>
+                    </div>
+                </div>
+
+                <div class="list-container">
+                    <h3>📋 Список логистов</h3>
+                    <div id="logisticians-list">
+                        <p class="loading">Загрузка...</p>
+                    </div>
                 </div>
             </section>
 
-            <hr>
-
-            <!-- Раздел грузов на публикацию -->
-            <section id="loads-section">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>Грузы на публикацию</h2>
-                    <button id="refresh-loads-button" style="padding: 8px 16px; cursor: pointer;">🔄 Обновить</button>
+            <!-- Вкладка: Грузы на публикацию -->
+            <section id="tab-pending" class="tab-content">
+                <div class="section-header">
+                    <h2>📋 Грузы на публикацию</h2>
+                    <button id="refresh-loads-button" class="btn-secondary">🔄 Обновить</button>
                 </div>
+                
                 <div id="pending-loads-list">
-                    <!-- Список грузов будет здесь -->
+                    <p class="loading">Загрузка...</p>
+                </div>
+            </section>
+
+            <!-- Вкладка: Отклоненные грузы -->
+            <section id="tab-rejected" class="tab-content">
+                <div class="section-header">
+                    <h2>🗑️ Отклоненные грузы</h2>
+                    <button id="refresh-rejected-button" class="btn-secondary">🔄 Обновить</button>
+                </div>
+                
+                <div id="rejected-loads-list">
+                    <p class="loading">Загрузка...</p>
                 </div>
             </section>
         </main>

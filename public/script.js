@@ -4,15 +4,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('main-content');
     const loginButton = document.getElementById('login-button');
     const passwordInput = document.getElementById('password-input');
+    
+    // Вкладки
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    // Логисты
     const logisticiansList = document.getElementById('logisticians-list');
     const addLogistButton = document.getElementById('add-logist-button');
     const logistAtiIdInput = document.getElementById('logist-ati-id');
     const logistNameInput = document.getElementById('logist-name');
+    
+    // Грузы на публикацию
     const pendingLoadsList = document.getElementById('pending-loads-list');
     const refreshLoadsButton = document.getElementById('refresh-loads-button');
+    
+    // Отклоненные грузы
+    const rejectedLoadsList = document.getElementById('rejected-loads-list');
+    const refreshRejectedButton = document.getElementById('refresh-rejected-button');
+
+    // --- Tabs Management ---
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            
+            // Убираем активный класс со всех кнопок и контента
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Добавляем активный класс к выбранной вкладке
+            button.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // Загружаем данные для вкладки
+            if (tabName === 'logisticians') {
+                loadLogisticians();
+            } else if (tabName === 'pending') {
+                loadPendingLoads();
+            } else if (tabName === 'rejected') {
+                loadRejectedLoads();
+            }
+        });
+    });
 
     // --- Authentication ---
-
     async function fetchWithAuth(url, options = {}) {
         const password = sessionStorage.getItem('adminPassword');
         if (!password) {
@@ -57,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showLogin() {
-        authSection.style.display = 'block';
+        authSection.style.display = 'flex';
         mainContent.style.display = 'none';
     }
 
@@ -65,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
         authSection.style.display = 'none';
         mainContent.style.display = 'block';
         loadLogisticians();
-        loadPendingLoads();
     }
 
     loginButton.addEventListener('click', () => {
@@ -86,9 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Logisticians Management ---
-
     async function loadLogisticians() {
-        logisticiansList.innerHTML = '<p><em>Загрузка...</em></p>';
+        logisticiansList.innerHTML = '<p class="loading">Загрузка...</p>';
         try {
             const data = await fetchWithAuth('/api/logisticians');
             renderLogisticians(data);
@@ -106,8 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <ul class="styled-list">
                 ${logisticians.map(l => `
                     <li>
-                        <span>${l.name} (ATI ID: ${l.ati_id})</span>
-                        <button class="delete-btn" data-id="${l.id}">Удалить</button>
+                        <span><strong>${l.name}</strong> (ATI ID: ${l.ati_id})</span>
+                        <button class="delete-btn" data-id="${l.id}">🗑️ Удалить</button>
                     </li>
                 `).join('')}
             </ul>
@@ -132,16 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
             logistAtiIdInput.value = '';
             logistNameInput.value = '';
             
-            // Обновляем список логистов
             await loadLogisticians();
-            
-            // Показываем сообщение
-            alert(result.message || 'Логист добавлен! Грузы будут обновлены автоматически через несколько секунд.');
-            
-            // Обновляем грузы через 3 секунды (даем время серверу пересканировать)
-            setTimeout(async () => {
-                await loadPendingLoads();
-            }, 3000);
+            alert(result.message || 'Логист добавлен!');
         } catch (error) {
             // Error is handled in fetchWithAuth
         }
@@ -156,16 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'DELETE'
                     });
                     
-                    // Обновляем список логистов
                     await loadLogisticians();
-                    
-                    // Показываем сообщение
-                    alert(result.message || 'Логист удален! Грузы будут обновлены автоматически через несколько секунд.');
-                    
-                    // Обновляем грузы через 3 секунды (даем время серверу очистить очередь)
-                    setTimeout(async () => {
-                        await loadPendingLoads();
-                    }, 3000);
+                    alert(result.message || 'Логист удален!');
                 } catch (error) {
                     // Error is handled in fetchWithAuth
                 }
@@ -174,15 +191,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Pending Loads Management ---
-
     async function loadPendingLoads() {
-        pendingLoadsList.innerHTML = '<p><em>Загрузка...</em></p>';
+        pendingLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
         try {
             const loads = await fetchWithAuth('/api/pending-loads');
             renderPendingLoads(loads);
         } catch (error) {
-            console.error('Ошибка при загрузке ожидающих грузов:', error); // Добавляем логирование
-            pendingLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список грузов. Подробности в консоли браузера (F12).</p>';
+            console.error('Ошибка при загрузке ожидающих грузов:', error);
+            pendingLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список грузов.</p>';
         }
     }
 
@@ -192,6 +208,136 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        pendingLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'pending')).join('');
+    }
+
+    pendingLoadsList.addEventListener('click', async (event) => {
+        const target = event.target;
+        const loadCard = target.closest('.load-card');
+        if (!loadCard) return;
+
+        const loadId = loadCard.dataset.loadId;
+
+        if (target.classList.contains('publish-btn')) {
+            const topicSelect = loadCard.querySelector('.topic-select');
+            const topicId = parseInt(topicSelect.value, 10);
+            
+            if (confirm(`Опубликовать груз в топик "${topicSelect.options[topicSelect.selectedIndex].text}"?`)) {
+                try {
+                    await fetchWithAuth('/api/publish', {
+                        method: 'POST',
+                        body: JSON.stringify({ loadId, topicId })
+                    });
+                    loadCard.remove();
+                    alert('Груз успешно опубликован!');
+                    await loadPendingLoads();
+                } catch (error) {
+                    await loadPendingLoads();
+                }
+            }
+        }
+
+        if (target.classList.contains('reject-btn')) {
+            if (confirm('Вы уверены, что хотите отклонить этот груз?')) {
+                try {
+                    await fetchWithAuth('/api/reject-load', {
+                        method: 'POST',
+                        body: JSON.stringify({ loadId })
+                    });
+                    loadCard.remove();
+                    alert('Груз отклонен и сохранен в архив.');
+                    await loadPendingLoads();
+                } catch (error) {
+                    await loadPendingLoads();
+                }
+            }
+        }
+    });
+
+    refreshLoadsButton.addEventListener('click', async () => {
+        refreshLoadsButton.disabled = true;
+        refreshLoadsButton.textContent = '⏳ Обновление...';
+        try {
+            await loadPendingLoads();
+        } finally {
+            refreshLoadsButton.disabled = false;
+            refreshLoadsButton.textContent = '🔄 Обновить';
+        }
+    });
+
+    // --- Rejected Loads Management ---
+    async function loadRejectedLoads() {
+        rejectedLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
+        try {
+            const loads = await fetchWithAuth('/api/rejected-loads');
+            renderRejectedLoads(loads);
+        } catch (error) {
+            console.error('Ошибка при загрузке отклоненных грузов:', error);
+            rejectedLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список отклоненных грузов.</p>';
+        }
+    }
+
+    function renderRejectedLoads(loads) {
+        if (!loads || loads.length === 0) {
+            rejectedLoadsList.innerHTML = '<p>Нет отклоненных грузов.</p>';
+            return;
+        }
+
+        rejectedLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'rejected')).join('');
+    }
+
+    rejectedLoadsList.addEventListener('click', async (event) => {
+        const target = event.target;
+        const loadCard = target.closest('.load-card');
+        if (!loadCard) return;
+
+        const loadId = loadCard.dataset.loadId;
+
+        if (target.classList.contains('restore-btn')) {
+            if (confirm('Восстановить этот груз в очередь на публикацию?')) {
+                try {
+                    await fetchWithAuth('/api/restore-load', {
+                        method: 'POST',
+                        body: JSON.stringify({ loadId })
+                    });
+                    loadCard.remove();
+                    alert('Груз восстановлен в очередь!');
+                    await loadRejectedLoads();
+                } catch (error) {
+                    await loadRejectedLoads();
+                }
+            }
+        }
+
+        if (target.classList.contains('delete-forever-btn')) {
+            if (confirm('Удалить этот груз навсегда? Это действие нельзя отменить!')) {
+                try {
+                    await fetchWithAuth(`/api/rejected-loads/${loadId}`, {
+                        method: 'DELETE'
+                    });
+                    loadCard.remove();
+                    alert('Груз удален навсегда.');
+                    await loadRejectedLoads();
+                } catch (error) {
+                    await loadRejectedLoads();
+                }
+            }
+        }
+    });
+
+    refreshRejectedButton.addEventListener('click', async () => {
+        refreshRejectedButton.disabled = true;
+        refreshRejectedButton.textContent = '⏳ Обновление...';
+        try {
+            await loadRejectedLoads();
+        } finally {
+            refreshRejectedButton.disabled = false;
+            refreshRejectedButton.textContent = '🔄 Обновить';
+        }
+    });
+
+    // --- Helper Functions ---
+    function createLoadCard(load, type) {
         const topics = [
             { id: null, name: 'General' },
             { id: 115, name: 'Загрузки вся РФ' },
@@ -206,163 +352,117 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 111, name: 'Международные загрузки' }
         ];
 
-        // Функция для форматирования даты
-        function formatDate(dateString) {
-            if (!dateString) return 'н/д';
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-            } catch {
-                return 'н/д';
-            }
+        const dateStr = getDateString(load);
+        const route = getRoute(load);
+        const cargo = getCargo(load);
+        const transport = getTransport(load);
+        const price = getPrice(load);
+        const contact = getContact(load);
+
+        let actionsHTML = '';
+        if (type === 'pending') {
+            actionsHTML = `
+                <select class="topic-select">
+                    ${topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+                </select>
+                <button class="publish-btn">✅ Опубликовать</button>
+                <button class="reject-btn">❌ Отклонить</button>
+            `;
+        } else if (type === 'rejected') {
+            actionsHTML = `
+                <button class="restore-btn">♻️ Восстановить</button>
+                <button class="delete-forever-btn">🗑️ Удалить навсегда</button>
+            `;
         }
 
-        // Функция для получения строки даты
-        function getDateString(load) {
-            if (load.DateType === 0) {
-                return `📅 Дата: ${formatDate(load.FirstDate)}`;
-            } else if (load.DateType === 1) {
-                return `📅 Дата: ${formatDate(load.FirstDate)} - ${formatDate(load.LastDate)}`;
-            } else if (load.DateType === 2) {
-                return '📅 Дата: Постоянно';
-            } else if (load.DateType === 3) {
-                return '📅 Дата: Запрос ставки';
-            }
-            return '📅 Дата: н/д';
-        }
-
-        // Функция для получения маршрута
-        function getRoute(load) {
-            const from = load.Loading?.CityId || 'н/д';
-            const to = load.Unloading?.CityId || 'н/д';
-            const distance = load.Distance ? ` (${load.Distance} км)` : '';
-            return `📍 Маршрут: ${from} → ${to}${distance}`;
-        }
-
-        // Функция для получения характера груза
-        function getCargo(load) {
-            const type = load.Cargo?.CargoType || 'Груз';
-            const weight = load.Cargo?.Weight || 0;
-            const volume = load.Cargo?.Volume || 0;
-            return `📦 Характер груза: ${type} - ${weight} т / ${volume} м³`;
-        }
-
-        // Функция для получения транспорта
-        function getTransport(load) {
-            const carTypes = {
-                1: 'Тент', 2: 'Реф', 3: 'Изотерм', 4: 'Бортовой',
-                5: 'Контейнеровоз', 6: 'Автовоз', 7: 'Цистерна',
-                8: 'Самосвал', 9: 'Низкорамник', 10: 'Фургон'
-            };
-            const carType = carTypes[load.Transport?.CarType] || 'Не указан';
-            const qty = load.Transport?.TrucksQuantity || 1;
-            return `🚛 Транспорт: ${carType}${qty > 1 ? ` x${qty}` : ''}`;
-        }
-
-        // Функция для получения ставки
-        function getPrice(load) {
-            const currencies = { 1: '₽', 2: '$', 3: '€', 4: '₴', 5: '₸' };
-            const currency = currencies[load.Payment?.CurrencyId] || '₽';
-            
-            let price = 'По договоренности';
-            if (load.Payment?.RateSum) {
-                price = `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
-            } else if (load.Payment?.SumWithoutNDS) {
-                price = `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
-            } else if (load.TruePrice) {
-                price = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
-            }
-            
-            if (load.Payment?.Torg) {
-                price += ' (торг)';
-            }
-            
-            return `💰 Ставка: ${price}`;
-        }
-
-        // Функция для получения контактов
-        function getContact(load) {
-            return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
-        }
-
-        pendingLoadsList.innerHTML = loads.map(load => `
+        return `
             <div class="load-card" data-load-id="${load.Id}">
                 <div class="load-details">
-                    <p>${getDateString(load)}</p>
-                    <p><strong>${getRoute(load)}</strong></p>
-                    <p>${getCargo(load)}</p>
-                    <p>${getTransport(load)}</p>
-                    <p><strong>${getPrice(load)}</strong></p>
-                    <p style="color: #666; font-size: 0.9em;">${getContact(load)}</p>
+                    <p>${dateStr}</p>
+                    <p><strong>${route}</strong></p>
+                    <p>${cargo}</p>
+                    <p>${transport}</p>
+                    <p><strong>${price}</strong></p>
+                    <p style="color: #666; font-size: 0.9em;">${contact}</p>
                 </div>
                 <div class="load-actions">
-                    <select class="topic-select">
-                        ${topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
-                    </select>
-                    <button class="publish-btn">Опубликовать</button>
-                    <button class="reject-btn">Отклонить</button>
+                    ${actionsHTML}
                 </div>
             </div>
-        `).join('');
+        `;
     }
 
-    pendingLoadsList.addEventListener('click', async (event) => {
-        const target = event.target;
-        const loadCard = target.closest('.load-card');
-        if (!loadCard) return;
-
-        const loadId = loadCard.dataset.loadId; // Теперь это GUID (строка), не число
-
-        if (target.classList.contains('publish-btn')) {
-            const topicSelect = loadCard.querySelector('.topic-select');
-            const topicId = parseInt(topicSelect.value, 10);
-            
-            if (confirm(`Опубликовать груз в топик "${topicSelect.options[topicSelect.selectedIndex].text}"?`)) {
-                try {
-                    await fetchWithAuth('/api/publish', {
-                        method: 'POST',
-                        body: JSON.stringify({ loadId, topicId })
-                    });
-                    // Сразу удаляем карточку из DOM для быстрого отклика
-                    loadCard.remove();
-                    alert('Груз успешно опубликован!');
-                    // Обновляем список для синхронизации с сервером
-                    await loadPendingLoads();
-                } catch (error) {
-                    // Error is handled in fetchWithAuth
-                    // В случае ошибки обновляем список, чтобы восстановить состояние
-                    await loadPendingLoads();
-                }
-            }
-        }
-
-        if (target.classList.contains('reject-btn')) {
-            if (confirm('Вы уверены, что хотите отклонить этот груз?')) {
-                try {
-                    await fetchWithAuth('/api/reject-load', {
-                        method: 'POST',
-                        body: JSON.stringify({ loadId })
-                    });
-                    alert('Груз отклонен.');
-                    await loadPendingLoads();
-                } catch (error) {
-                    // Error is handled in fetchWithAuth
-                }
-            }
-        }
-    });
-
-    // --- Manual Refresh Button ---
-    refreshLoadsButton.addEventListener('click', async () => {
-        refreshLoadsButton.disabled = true;
-        refreshLoadsButton.textContent = '⏳ Обновление...';
+    function formatDate(dateString) {
+        if (!dateString) return 'н/д';
         try {
-            await loadPendingLoads();
-        } finally {
-            refreshLoadsButton.disabled = false;
-            refreshLoadsButton.textContent = '🔄 Обновить';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        } catch {
+            return 'н/д';
         }
-    });
+    }
+
+    function getDateString(load) {
+        if (load.DateType === 0) {
+            return `📅 Дата: ${formatDate(load.FirstDate)}`;
+        } else if (load.DateType === 1) {
+            return `📅 Дата: ${formatDate(load.FirstDate)} - ${formatDate(load.LastDate)}`;
+        } else if (load.DateType === 2) {
+            return '📅 Дата: Постоянно';
+        } else if (load.DateType === 3) {
+            return '📅 Дата: Запрос ставки';
+        }
+        return '📅 Дата: н/д';
+    }
+
+    function getRoute(load) {
+        const from = load.Loading?.CityId || 'н/д';
+        const to = load.Unloading?.CityId || 'н/д';
+        const distance = load.Distance ? ` (${load.Distance} км)` : '';
+        return `📍 Маршрут: ${from} → ${to}${distance}`;
+    }
+
+    function getCargo(load) {
+        const type = load.Cargo?.CargoType || 'Груз';
+        const weight = load.Cargo?.Weight || 0;
+        const volume = load.Cargo?.Volume || 0;
+        return `📦 Характер груза: ${type} - ${weight} т / ${volume} м³`;
+    }
+
+    function getTransport(load) {
+        const carTypes = {
+            1: 'Тент', 2: 'Реф', 3: 'Изотерм', 4: 'Бортовой',
+            5: 'Контейнеровоз', 6: 'Автовоз', 7: 'Цистерна',
+            8: 'Самосвал', 9: 'Низкорамник', 10: 'Фургон'
+        };
+        const carType = carTypes[load.Transport?.CarType] || 'Не указан';
+        const qty = load.Transport?.TrucksQuantity || 1;
+        return `🚛 Транспорт: ${carType}${qty > 1 ? ` x${qty}` : ''}`;
+    }
+
+    function getPrice(load) {
+        const currencies = { 1: '₽', 2: '$', 3: '€', 4: '₴', 5: '₸' };
+        const currency = currencies[load.Payment?.CurrencyId] || '₽';
+        
+        let price = 'По договоренности';
+        if (load.Payment?.RateSum) {
+            price = `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
+        } else if (load.Payment?.SumWithoutNDS) {
+            price = `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
+        } else if (load.TruePrice) {
+            price = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
+        }
+        
+        if (load.Payment?.Torg) {
+            price += ' (торг)';
+        }
+        
+        return `💰 Ставка: ${price}`;
+    }
+
+    function getContact(load) {
+        return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
+    }
 
     // --- Initial Load ---
     if (sessionStorage.getItem('adminPassword')) {
