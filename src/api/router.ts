@@ -11,6 +11,10 @@ import {
   getPendingLoadById,
   removePendingLoad,
   markLoadAsPublished,
+  addRejectedLoad,
+  getRejectedLoads,
+  restoreRejectedLoad,
+  deleteRejectedLoad,
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
@@ -153,7 +157,7 @@ export function createApiRouter(bot: TelegramBot) {
       const message = formatLoadMessage(load);
       
       const telegramOptions: TelegramBot.SendMessageOptions = {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       };
 
       // Если topicId предоставлен и является числом, добавляем его в опции
@@ -214,7 +218,7 @@ export function createApiRouter(bot: TelegramBot) {
 
   /**
    * POST /api/reject-load
-   * Отклоняет (удаляет) груз из очереди на публикацию.
+   * Отклоняет груз из очереди на публикацию и сохраняет в rejected_loads.
    * Принимает loadId (обязательно).
    */
   apiRouter.post('/reject-load', async (req: Request, res: Response) => {
@@ -231,14 +235,72 @@ export function createApiRouter(bot: TelegramBot) {
         return res.status(404).json({ error: `Груз с ID ${loadId} не найден в очереди.` });
       }
 
+      // Сохраняем в отклоненные
+      await addRejectedLoad(load);
+      
+      // Удаляем из очереди
       await removePendingLoad(loadId);
 
-      console.log(`🗑️ Груз ${loadId} отклонен и удален из очереди.`);
-      res.status(200).json({ message: 'Груз успешно отклонен.' });
+      console.log(`🗑️ Груз ${loadId} отклонен и перемещен в архив.`);
+      res.status(200).json({ message: 'Груз успешно отклонен и сохранен в архив.' });
 
     } catch (error) {
       console.error('❌ Ошибка при отклонении груза:', error);
       res.status(500).json({ error: 'Ошибка сервера при отклонении груза.' });
+    }
+  });
+
+  /**
+   * GET /api/rejected-loads
+   * Получает список всех отклоненных грузов.
+   */
+  apiRouter.get('/rejected-loads', async (req: Request, res: Response) => {
+    try {
+      const rejectedLoads = await getRejectedLoads();
+      res.json(rejectedLoads);
+    } catch (error) {
+      res.status(500).json({ error: 'Ошибка сервера при получении отклоненных грузов.' });
+    }
+  });
+
+  /**
+   * POST /api/restore-load
+   * Восстанавливает отклоненный груз обратно в очередь.
+   * Принимает loadId (обязательно).
+   */
+  apiRouter.post('/restore-load', async (req: Request, res: Response) => {
+    const { loadId } = req.body;
+
+    if (!loadId) {
+      return res.status(400).json({ error: 'Необходим loadId.' });
+    }
+
+    try {
+      await restoreRejectedLoad(loadId);
+      res.status(200).json({ message: 'Груз успешно восстановлен в очередь.' });
+    } catch (error) {
+      console.error('❌ Ошибка при восстановлении груза:', error);
+      res.status(500).json({ error: 'Ошибка сервера при восстановлении груза.' });
+    }
+  });
+
+  /**
+   * DELETE /api/rejected-loads/:loadId
+   * Удаляет отклоненный груз навсегда.
+   */
+  apiRouter.delete('/rejected-loads/:loadId', async (req: Request, res: Response) => {
+    const { loadId } = req.params;
+
+    if (!loadId) {
+      return res.status(400).json({ error: 'Необходим loadId.' });
+    }
+
+    try {
+      await deleteRejectedLoad(loadId);
+      res.status(200).json({ message: 'Груз успешно удален навсегда.' });
+    } catch (error) {
+      console.error('❌ Ошибка при удалении груза:', error);
+      res.status(500).json({ error: 'Ошибка сервера при удалении груза.' });
     }
   });
 

@@ -323,10 +323,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         body: JSON.stringify({ loadId, topicId })
                     });
+                    // Сразу удаляем карточку из DOM для быстрого отклика
+                    loadCard.remove();
                     alert('Груз успешно опубликован!');
+                    // Обновляем список для синхронизации с сервером
                     await loadPendingLoads();
                 } catch (error) {
                     // Error is handled in fetchWithAuth
+                    // В случае ошибки обновляем список, чтобы восстановить состояние
+                    await loadPendingLoads();
                 }
             }
         }

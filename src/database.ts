@@ -52,6 +52,17 @@ export async function initializeDatabase() {
   `);
   console.log('Таблица "pending_loads" готова.');
 
+  // Создаем таблицу для отклоненных грузов
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS rejected_loads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ati_load_id TEXT NOT NULL UNIQUE,
+      load_data TEXT NOT NULL,
+      rejected_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Таблица "rejected_loads" готова.');
+
   return db;
 }
 
@@ -344,5 +355,113 @@ export async function cleanupPendingLoads(): Promise<void> {
     }
   } catch (error) {
     console.error('❌ Ошибка при очистке очереди грузов:', error);
+  }
+}
+
+/**
+ * Добавляет груз в список отклоненных.
+ * @param load Объект груза.
+ */
+export async function addRejectedLoad(load: any): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    await db.run(
+      'INSERT INTO rejected_loads (ati_load_id, load_data) VALUES (?, ?)',
+      load.Id,
+      JSON.stringify(load)
+    );
+    console.log(`🚫 Груз с ID ${load.Id} добавлен в список отклоненных.`);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      // Груз уже в списке отклоненных
+      console.log(`⚠️ Груз с ID ${load.Id} уже в списке отклоненных.`);
+    } else {
+      console.error(`Ошибка при добавлении груза ${load.Id} в список отклоненных:`, error);
+    }
+  }
+}
+
+/**
+ * Получает все отклоненные грузы.
+ * @returns {Promise<any[]>} Массив объектов грузов.
+ */
+export async function getRejectedLoads(): Promise<any[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  try {
+    const rows = await db.all<{ ati_load_id: string, load_data: string }[]>(
+      'SELECT ati_load_id, load_data FROM rejected_loads ORDER BY rejected_at DESC'
+    );
+
+    const loads = rows.reduce((acc, row) => {
+      try {
+        acc.push(JSON.parse(row.load_data));
+      } catch (e) {
+        console.error(`[DB_ERROR] Не удалось распарсить JSON для отклоненного груза с ID: ${row.ati_load_id}. Ошибка:`, e);
+      }
+      return acc;
+    }, [] as any[]);
+
+    return loads;
+  } catch (error) {
+    console.error('Ошибка при получении отклоненных грузов:', error);
+    throw error;
+  }
+}
+
+/**
+ * Восстанавливает отклоненный груз обратно в очередь на публикацию.
+ * @param atiLoadId ID груза ATI (GUID).
+ */
+export async function restoreRejectedLoad(atiLoadId: string): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    // Получаем груз из отклоненных
+    const row = await db.get<{ load_data: string }>(
+      'SELECT load_data FROM rejected_loads WHERE ati_load_id = ?',
+      atiLoadId
+    );
+    
+    if (!row) {
+      throw new Error(`Груз с ID ${atiLoadId} не найден в отклоненных.`);
+    }
+    
+    const load = JSON.parse(row.load_data);
+    
+    // Добавляем обратно в очередь
+    await addPendingLoad(load);
+    
+    // Удаляем из отклоненных
+    await db.run('DELETE FROM rejected_loads WHERE ati_load_id = ?', atiLoadId);
+    
+    console.log(`♻️ Груз с ID ${atiLoadId} восстановлен в очередь.`);
+  } catch (error) {
+    console.error(`Ошибка при восстановлении груза ${atiLoadId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Удаляет груз из списка отклоненных навсегда.
+ * @param atiLoadId ID груза ATI (GUID).
+ */
+export async function deleteRejectedLoad(atiLoadId: string): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  try {
+    await db.run('DELETE FROM rejected_loads WHERE ati_load_id = ?', atiLoadId);
+    console.log(`🗑️ Груз с ID ${atiLoadId} удален из отклоненных навсегда.`);
+  } catch (error) {
+    console.error(`Ошибка при удалении груза ${atiLoadId} из отклоненных:`, error);
   }
 }

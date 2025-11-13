@@ -50,6 +50,17 @@ const CAR_TYPES: Record<number, string> = {
 };
 
 /**
+ * Экранирует специальные символы HTML для Telegram
+ */
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
  * Форматирует дату в читаемый вид
  */
 function formatDate(dateString: string): string {
@@ -95,7 +106,7 @@ function formatDateTime(dateString: string): string {
  * Форматирует данные о грузе в сообщение для Telegram.
  * Формат: Дата | Маршрут | Характер груза | Транспорт | Ставка | Контакты
  * @param load - Объект с данными о грузе от ATI API.
- * @returns Отформатированная строка в Markdown.
+ * @returns Отформатированная строка в HTML.
  */
 export const formatLoadMessage = (load: Load): string => {
   const lines: string[] = [];
@@ -104,26 +115,26 @@ export const formatLoadMessage = (load: Load): string => {
   let dateStr = '';
   if (load.DateType === 0) {
     // Готов к загрузке
-    dateStr = `📅 *Дата:* ${formatDateTime(load.FirstDate)}`;
+    dateStr = `📅 <b>Дата:</b> ${formatDateTime(load.FirstDate)}`;
   } else if (load.DateType === 1) {
     // С даты по дату
-    dateStr = `📅 *Дата:* ${formatDateTime(load.FirstDate)} - ${formatDateTime(load.LastDate)}`;
+    dateStr = `📅 <b>Дата:</b> ${formatDateTime(load.FirstDate)} - ${formatDateTime(load.LastDate)}`;
   } else if (load.DateType === 2) {
     // Постоянно
-    dateStr = '📅 *Дата:* Постоянно';
+    dateStr = '📅 <b>Дата:</b> Постоянно';
   } else if (load.DateType === 3) {
     // Груза нет, запрос ставки
-    dateStr = '📅 *Дата:* Запрос ставки';
+    dateStr = '📅 <b>Дата:</b> Запрос ставки';
   }
   lines.push(dateStr);
   
   // 2. МАРШРУТ
   const fromCity = load.Loading?.CityId || 'н/д';
   const toCity = load.Unloading?.CityId || 'н/д';
-  const fromStreet = load.Loading?.Street ? ` (${load.Loading.Street})` : '';
-  const toStreet = load.Unloading?.Street ? ` (${load.Unloading.Street})` : '';
+  const fromStreet = load.Loading?.Street ? ` (${escapeHtml(load.Loading.Street)})` : '';
+  const toStreet = load.Unloading?.Street ? ` (${escapeHtml(load.Unloading.Street)})` : '';
   
-  lines.push(`📍 *Маршрут:* ${fromCity}${fromStreet} → ${toCity}${toStreet}`);
+  lines.push(`📍 <b>Маршрут:</b> ${fromCity}${fromStreet} → ${toCity}${toStreet}`);
   
   if (load.Distance) {
     lines.push(`   🛣 Расстояние: ${load.Distance} км`);
@@ -132,20 +143,20 @@ export const formatLoadMessage = (load: Load): string => {
   // 3. ХАРАКТЕР ГРУЗА
   const weight = load.Cargo?.Weight || 0;
   const volume = load.Cargo?.Volume || 0;
-  const cargoType = load.Cargo?.CargoType || 'Груз';
+  const cargoType = escapeHtml(load.Cargo?.CargoType || 'Груз');
   
-  lines.push(`📦 *Характер груза:* ${cargoType} - ${weight} т / ${volume} м³`);
+  lines.push(`📦 <b>Характер груза:</b> ${cargoType} - ${weight} т / ${volume} м³`);
   
   // Примечание к грузу (если есть)
   if (load.Note && load.Note.length < 100) {
-    lines.push(`   💬 ${load.Note}`);
+    lines.push(`   💬 ${escapeHtml(load.Note)}`);
   }
   
   // 4. ТРАНСПОРТ
   const carType = CAR_TYPES[load.Transport?.CarType || 1] || 'Не указан';
   const trucksQty = load.Transport?.TrucksQuantity || 1;
   
-  let transportStr = `🚛 *Транспорт:* ${carType}`;
+  let transportStr = `🚛 <b>Транспорт:</b> ${carType}`;
   if (trucksQty > 1) {
     transportStr += ` x${trucksQty}`;
   }
@@ -161,7 +172,7 @@ export const formatLoadMessage = (load: Load): string => {
   
   // 5. СТАВКА
   const currency = CURRENCIES[load.Payment?.CurrencyId || 1] || '₽';
-  let priceStr = '💰 *Ставка:* ';
+  let priceStr = '💰 <b>Ставка:</b> ';
   
   if (load.Payment?.RateSum) {
     priceStr += `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
@@ -187,24 +198,24 @@ export const formatLoadMessage = (load: Load): string => {
   
   // 6. КОНТАКТЫ
   lines.push('');
-  lines.push('👤 *Контакты:*');
+  lines.push('👤 <b>Контакты:</b>');
   
   const contact = getContactInfo(load.ContactId1);
-  lines.push(`   ${contact.name}`);
-  lines.push(`   📞 ${contact.phone}`);
+  lines.push(`   ${escapeHtml(contact.name)}`);
+  lines.push(`   📞 ${escapeHtml(contact.phone)}`);
   
   if (contact.telegram) {
-    lines.push(`   💬 ${contact.telegram}`);
+    lines.push(`   💬 ${escapeHtml(contact.telegram)}`);
   }
   
   // Если есть второй контакт
   if (load.ContactId2) {
     const contact2 = getContactInfo(load.ContactId2);
     lines.push('');
-    lines.push(`   ${contact2.name}`);
-    lines.push(`   📞 ${contact2.phone}`);
+    lines.push(`   ${escapeHtml(contact2.name)}`);
+    lines.push(`   📞 ${escapeHtml(contact2.phone)}`);
     if (contact2.telegram) {
-      lines.push(`   💬 ${contact2.telegram}`);
+      lines.push(`   💬 ${escapeHtml(contact2.telegram)}`);
     }
   }
   

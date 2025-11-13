@@ -12,7 +12,6 @@ node_modules/
 
 # Ignore database files
 database.db
-database_backup_1762976179864.db
 
 # Ignore compiled TypeScript output
 dist/
