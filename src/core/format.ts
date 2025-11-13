@@ -1,16 +1,7 @@
 // src/core/format.ts
 
 import { Load } from './types.js';
-
-/**
- * Справочник контактов логистов
- * TODO: В будущем получать из API или базы данных
- */
-const CONTACTS_MAP: Record<number, { phone: string; telegram: string; name: string }> = {
-  // Добавь сюда реальные ContactId из ATI
-  // Пример:
-  // 12345: { phone: '+7 (987) 213-52-80', telegram: '@sergey_antares116', name: 'Сергей' },
-};
+import { getContactById, AtiContact } from '../ati_api.js';
 
 /**
  * Словарь типов готовности груза
@@ -77,10 +68,49 @@ function formatDate(dateString: string): string {
 }
 
 /**
- * Получает контактную информацию по ContactId
+ * Извлекает Telegram из примечания контакта
  */
-function getContactInfo(contactId: number): { phone: string; telegram: string; name: string } {
-  return CONTACTS_MAP[contactId] || {
+function extractTelegram(note: string | null): string {
+  if (!note) return '';
+  
+  // Ищем @username или t.me/username
+  const telegramMatch = note.match(/@[\w]+|t\.me\/([\w]+)/i);
+  if (telegramMatch) {
+    return telegramMatch[0].startsWith('@') ? telegramMatch[0] : `@${telegramMatch[1]}`;
+  }
+  
+  return '';
+}
+
+/**
+ * Форматирует номер телефона
+ */
+function formatPhone(phone: string | null, mobile: string | null): string {
+  if (mobile) return mobile;
+  if (phone) return phone;
+  return 'Не указан';
+}
+
+/**
+ * Получает контактную информацию по ContactId из ATI API
+ */
+async function getContactInfo(contactId: number): Promise<{ phone: string; telegram: string; name: string }> {
+  try {
+    const contact = await getContactById(contactId);
+    
+    if (contact) {
+      return {
+        name: contact.name || `Контакт ${contactId}`,
+        phone: formatPhone(contact.phone, contact.mobile),
+        telegram: extractTelegram(contact.note),
+      };
+    }
+  } catch (error) {
+    console.error(`Ошибка при получении контакта ${contactId}:`, error);
+  }
+  
+  // Fallback если не удалось получить контакт
+  return {
     phone: 'Не указан',
     telegram: '',
     name: `Контакт ${contactId}`,
@@ -108,7 +138,7 @@ function formatDateTime(dateString: string): string {
  * @param load - Объект с данными о грузе от ATI API.
  * @returns Отформатированная строка в HTML.
  */
-export const formatLoadMessage = (load: Load): string => {
+export const formatLoadMessage = async (load: Load): Promise<string> => {
   const lines: string[] = [];
   
   // 1. ДАТА
@@ -200,7 +230,7 @@ export const formatLoadMessage = (load: Load): string => {
   lines.push('');
   lines.push('👤 <b>Контакты:</b>');
   
-  const contact = getContactInfo(load.ContactId1);
+  const contact = await getContactInfo(load.ContactId1);
   lines.push(`   ${escapeHtml(contact.name)}`);
   lines.push(`   📞 ${escapeHtml(contact.phone)}`);
   
@@ -210,7 +240,7 @@ export const formatLoadMessage = (load: Load): string => {
   
   // Если есть второй контакт
   if (load.ContactId2) {
-    const contact2 = getContactInfo(load.ContactId2);
+    const contact2 = await getContactInfo(load.ContactId2);
     lines.push('');
     lines.push(`   ${escapeHtml(contact2.name)}`);
     lines.push(`   📞 ${escapeHtml(contact2.phone)}`);

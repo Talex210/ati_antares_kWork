@@ -1373,3 +1373,272 @@ false
 "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 }
 ]
+
+
+--------------------- Получение всех контактов своей фирмы
+
+Получение всех контактов своей фирмы
+Метод получения всех контактов фирмы
+get
+/v1.0/firms/contacts
+Модель и примеры
+Консоль
+Запрос
+Пример запроса
+CURL
+1C
+curl 'https://api.ati.su/v1.0/firms/contacts' \
+  -X 'GET' \
+  -H 'Authorization: Bearer {authorizationToken}' \
+  -H 'Content-Type: application/json'
+
+Ответ
+200
+Success
+Модель
+[{
+id: int32
+Идентификатор контакта
+
+firm_name: string (nullable)
+Название фирмы
+
+ownership: string (nullable)
+Организационно-правовая форма
+
+ownership_id: int32
+Форма собственности
+
+ati_id: string (nullable)
+Код фирмы в ATI.SU
+
+firm_deletion_date: date-time (nullable)
+Дата удаления аккаунта
+
+name: string (nullable)
+Имя контакта
+
+phone: string (nullable)
+Номер телефона (основной)
+
+e_mail: string (nullable)
+Электронная почта контакта
+
+email_for_link: string (nullable)
+Адрес для отправки письма на задание логина/пароля
+
+icq: string (nullable)
+ICQ контакта
+
+mobile: string (nullable)
+Номер телефона контакта (мобильный)
+
+fax: string (nullable)
+Номер телефона контакта (факс)
+
+note: string (nullable)
+Примечание
+
+is_visible: boolean
+Контакта виден / скрыт
+
+is_email_visible: boolean
+E-mail виден / скрыт
+
+mobile_id: int32 (nullable)
+Номер телефона (мобильный) без кода города
+
+phone_id: int32 (nullable)
+Номер телефона (основной) без кода города
+
+fax_id: int32 (nullable)
+Номер телефона контакта (факс) без кода города
+
+skype_name: string (nullable)
+Логин в Skype
+
+city_id: int32 (nullable)
+Идентификатори города
+
+attributes: int32 (nullable)
+Атрибуты контакта
+
+access_rights: int32
+Права контакта (для ррд)
+
+gsm_operator_id: int32 (nullable)
+Идентификатор сотового оператора
+
+is_deleted: boolean
+Удален ли контакт
+
+read only
+deletion_date: date-time (nullable)
+Дата удаления контакта
+
+is_photo_exists: boolean
+Загружено ли фото
+
+login: string (nullable)
+Логин контакта
+
+has_personal_password: boolean
+Есть ли персональный пароль
+
+language: string (nullable)
+Язык сайта выбранный, контактом
+
+department_id: int32
+Идентификатор основного подразделения контакта
+
+position: string (nullable)
+Должность
+
+user_rights: enum
+[0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 131072, 262144, 2097152, 8388608, 8534011, 16777216, 25313275, 27670527, 27672575]
+Права контакта
+
+contact_right_nesting_type_id: enum
+[0, 1, 2]
+Тип доступа
+0 - только свое подразделение
+1 - только свое и дочернее подразделение
+2 - все подразделения
+
+}]
+Пример
+[
+{
+"id"
+:
+0
+,
+"firm_name"
+:
+"string"
+,
+"ownership"
+:
+"string"
+,
+"ownership_id"
+:
+0
+,
+"ati_id"
+:
+"string"
+,
+"firm_deletion_date"
+:
+"1970-01-01T00:00:00.000Z"
+,
+"name"
+:
+"string"
+,
+"phone"
+:
+"string"
+,
+"e_mail"
+:
+"string"
+,
+"email_for_link"
+:
+"string"
+,
+"icq"
+:
+"string"
+,
+"mobile"
+:
+"string"
+,
+"fax"
+:
+"string"
+,
+"note"
+:
+"string"
+,
+"is_visible"
+:
+false
+,
+"is_email_visible"
+:
+false
+,
+"mobile_id"
+:
+0
+,
+"phone_id"
+:
+0
+,
+"fax_id"
+:
+0
+,
+"skype_name"
+:
+"string"
+,
+"city_id"
+:
+0
+,
+"attributes"
+:
+0
+,
+"access_rights"
+:
+0
+,
+"gsm_operator_id"
+:
+0
+,
+"deletion_date"
+:
+"1970-01-01T00:00:00.000Z"
+,
+"is_photo_exists"
+:
+false
+,
+"login"
+:
+"string"
+,
+"has_personal_password"
+:
+false
+,
+"language"
+:
+"string"
+,
+"department_id"
+:
+0
+,
+"position"
+:
+"string"
+,
+"user_rights"
+:
+0
+,
+"contact_right_nesting_type_id"
+:
+0
+}
+]

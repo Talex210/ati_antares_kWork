@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rejectedLoadsList = document.getElementById('rejected-loads-list');
     const refreshRejectedButton = document.getElementById('refresh-rejected-button');
 
+    // Кэш контактов
+    let contactsCache = null;
+
     // --- Tabs Management ---
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -190,25 +193,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Contacts Management ---
+    async function loadContacts() {
+        if (contactsCache) {
+            return contactsCache;
+        }
+        
+        try {
+            const contacts = await fetchWithAuth('/api/contacts');
+            contactsCache = contacts;
+            return contacts;
+        } catch (error) {
+            console.error('Ошибка при загрузке контактов:', error);
+            return [];
+        }
+    }
+
+    function getContactInfo(contactId, contacts) {
+        const contact = contacts.find(c => c.id === contactId);
+        if (!contact) {
+            return {
+                name: `Контакт ${contactId}`,
+                phone: 'Не указан',
+                telegram: ''
+            };
+        }
+
+        // Извлекаем Telegram из примечания
+        let telegram = '';
+        if (contact.note) {
+            const telegramMatch = contact.note.match(/@[\w]+|t\.me\/([\w]+)/i);
+            if (telegramMatch) {
+                telegram = telegramMatch[0].startsWith('@') ? telegramMatch[0] : `@${telegramMatch[1]}`;
+            }
+        }
+
+        return {
+            name: contact.name || `Контакт ${contactId}`,
+            phone: contact.mobile || contact.phone || 'Не указан',
+            telegram: telegram
+        };
+    }
+
     // --- Pending Loads Management ---
     async function loadPendingLoads() {
         pendingLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
         try {
-            const loads = await fetchWithAuth('/api/pending-loads');
-            renderPendingLoads(loads);
+            // Загружаем контакты и грузы параллельно
+            const [loads, contacts] = await Promise.all([
+                fetchWithAuth('/api/pending-loads'),
+                loadContacts()
+            ]);
+            renderPendingLoads(loads, contacts);
         } catch (error) {
             console.error('Ошибка при загрузке ожидающих грузов:', error);
             pendingLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список грузов.</p>';
         }
     }
 
-    function renderPendingLoads(loads) {
+    function renderPendingLoads(loads, contacts) {
         if (!loads || loads.length === 0) {
             pendingLoadsList.innerHTML = '<p>Нет грузов, ожидающих публикации.</p>';
             return;
         }
 
-        pendingLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'pending')).join('');
+        pendingLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'pending', contacts)).join('');
     }
 
     pendingLoadsList.addEventListener('click', async (event) => {
@@ -269,21 +318,25 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadRejectedLoads() {
         rejectedLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
         try {
-            const loads = await fetchWithAuth('/api/rejected-loads');
-            renderRejectedLoads(loads);
+            // Загружаем контакты и грузы параллельно
+            const [loads, contacts] = await Promise.all([
+                fetchWithAuth('/api/rejected-loads'),
+                loadContacts()
+            ]);
+            renderRejectedLoads(loads, contacts);
         } catch (error) {
             console.error('Ошибка при загрузке отклоненных грузов:', error);
             rejectedLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список отклоненных грузов.</p>';
         }
     }
 
-    function renderRejectedLoads(loads) {
+    function renderRejectedLoads(loads, contacts) {
         if (!loads || loads.length === 0) {
             rejectedLoadsList.innerHTML = '<p>Нет отклоненных грузов.</p>';
             return;
         }
 
-        rejectedLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'rejected')).join('');
+        rejectedLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'rejected', contacts)).join('');
     }
 
     rejectedLoadsList.addEventListener('click', async (event) => {
@@ -337,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Helper Functions ---
-    function createLoadCard(load, type) {
+    function createLoadCard(load, type, contacts = []) {
         const topics = [
             { id: null, name: 'General' },
             { id: 115, name: 'Загрузки вся РФ' },
@@ -357,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cargo = getCargo(load);
         const transport = getTransport(load);
         const price = getPrice(load);
-        const contact = getContact(load);
+        const contact = getContactDisplay(load, contacts);
 
         let actionsHTML = '';
         if (type === 'pending') {
@@ -383,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>${cargo}</p>
                     <p>${transport}</p>
                     <p><strong>${price}</strong></p>
-                    <p style="color: #666; font-size: 0.9em;">${contact}</p>
+                    <p style="color: #666; font-size: 0.9em; white-space: pre-line;">${contact}</p>
                 </div>
                 <div class="load-actions">
                     ${actionsHTML}
@@ -460,8 +513,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return `💰 Ставка: ${price}`;
     }
 
-    function getContact(load) {
-        return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
+    function getContactDisplay(load, contacts) {
+        if (!contacts || contacts.length === 0) {
+            return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
+        }
+
+        const contact1 = getContactInfo(load.ContactId1, contacts);
+        let result = `👤 Контакты:\n   ${contact1.name}\n   📞 ${contact1.phone}`;
+        
+        if (contact1.telegram) {
+            result += `\n   💬 ${contact1.telegram}`;
+        }
+
+        if (load.ContactId2) {
+            const contact2 = getContactInfo(load.ContactId2, contacts);
+            result += `\n\n   ${contact2.name}\n   📞 ${contact2.phone}`;
+            if (contact2.telegram) {
+                result += `\n   💬 ${contact2.telegram}`;
+            }
+        }
+
+        return result;
     }
 
     // --- Initial Load ---

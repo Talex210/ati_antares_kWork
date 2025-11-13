@@ -133,6 +133,21 @@ export function createApiRouter(bot: TelegramBot) {
   });
 
   /**
+   * GET /api/contacts
+   * Получает список всех контактов из ATI API.
+   */
+  apiRouter.get('/contacts', async (req: Request, res: Response) => {
+    try {
+      const { getContacts } = await import('../ati_api.js');
+      const contacts = await getContacts();
+      res.json(contacts);
+    } catch (error) {
+      console.error('❌ Ошибка при получении контактов:', error);
+      res.status(500).json({ error: 'Ошибка сервера при получении контактов.' });
+    }
+  });
+
+  /**
    * POST /api/publish
    * Публикует груз в Telegram.
    * Принимает loadId (обязательно) и topicId (опционально).
@@ -154,7 +169,7 @@ export function createApiRouter(bot: TelegramBot) {
         return res.status(404).json({ error: `Груз с ID ${loadId} не найден в очереди.` });
       }
 
-      const message = formatLoadMessage(load);
+      const message = await formatLoadMessage(load);
       
       const telegramOptions: TelegramBot.SendMessageOptions = {
         parse_mode: 'HTML',
