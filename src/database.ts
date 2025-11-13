@@ -27,6 +27,8 @@ export async function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ati_id INTEGER NOT NULL UNIQUE,
       name TEXT NOT NULL,
+      phone TEXT,
+      telegram TEXT,
       added_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -93,12 +95,14 @@ export interface WhitelistedLogistician {
   id: number;
   ati_id: number;
   name: string;
+  phone: string | null;
+  telegram: string | null;
   added_at: string;
 }
 
 
 /**
- * Получает полный список логистов из белого списка.
+ * Получает полный список логистов из белого списка с информацией о контактах.
  * @returns {Promise<WhitelistedLogistician[]>} Массив объектов логистов.
  */
 export async function getWhitelistedLogisticians(): Promise<WhitelistedLogistician[]> {
@@ -108,7 +112,7 @@ export async function getWhitelistedLogisticians(): Promise<WhitelistedLogistici
   }
   try {
     const logisticians = await db.all<WhitelistedLogistician[]>(
-      'SELECT id, ati_id, name, added_at FROM whitelisted_logisticians ORDER BY added_at DESC'
+      'SELECT id, ati_id, name, phone, telegram, added_at FROM whitelisted_logisticians ORDER BY added_at DESC'
     );
     return logisticians;
   } catch (error) {
@@ -121,21 +125,75 @@ export async function getWhitelistedLogisticians(): Promise<WhitelistedLogistici
  * Добавляет нового логиста в белый список.
  * @param atiId ATI ID логиста.
  * @param name Имя логиста.
+ * @param phone Телефон логиста (опционально).
+ * @param telegram Telegram логиста (опционально).
  */
-export async function addWhitelistedLogistician(atiId: number, name: string): Promise<void> {
+export async function addWhitelistedLogistician(
+  atiId: number, 
+  name: string, 
+  phone?: string, 
+  telegram?: string
+): Promise<void> {
   if (!db) {
     throw new Error('База данных не инициализирована.');
   }
   try {
     await db.run(
-      'INSERT INTO whitelisted_logisticians (ati_id, name) VALUES (?, ?)',
+      'INSERT INTO whitelisted_logisticians (ati_id, name, phone, telegram) VALUES (?, ?, ?, ?)',
       atiId,
-      name
+      name,
+      phone || null,
+      telegram || null
     );
     console.log(`Логист "${name}" (ATI ID: ${atiId}) добавлен в белый список.`);
   } catch (error) {
     console.error(`Ошибка при добавлении логиста ${name}:`, error);
     throw error; // Пробрасываем ошибку выше для обработки в API
+  }
+}
+
+/**
+ * Обновляет информацию о логисте (только телефон) из ATI API.
+ * Telegram НЕ обновляется, так как его нет в API.
+ */
+export async function updateLogisticianContactInfo(): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  
+  try {
+    const { getContacts } = await import('./ati_api.js');
+    const contacts = await getContacts();
+    const logisticians = await getWhitelistedLogisticians();
+    
+    let updatedCount = 0;
+    
+    for (const logist of logisticians) {
+      const contact = contacts.find(c => c.id === logist.ati_id);
+      if (contact) {
+        const phone = contact.mobile || contact.phone || null;
+        
+        // Обновляем только телефон, если он изменился
+        if (phone !== logist.phone) {
+          await db.run(
+            'UPDATE whitelisted_logisticians SET phone = ? WHERE id = ?',
+            phone,
+            logist.id
+          );
+          console.log(`📝 Обновлен телефон для ${logist.name}: ${phone}`);
+          updatedCount++;
+        }
+      }
+    }
+    
+    if (updatedCount === 0) {
+      console.log('✅ Все телефоны актуальны, обновлений не требуется.');
+    } else {
+      console.log(`✅ Обновлено телефонов: ${updatedCount}`);
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при обновлении информации о логистах:', error);
   }
 }
 

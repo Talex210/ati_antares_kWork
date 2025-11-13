@@ -67,20 +67,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-/**
- * Извлекает Telegram из примечания контакта
- */
-function extractTelegram(note: string | null): string {
-  if (!note) return '';
-  
-  // Ищем @username или t.me/username
-  const telegramMatch = note.match(/@[\w]+|t\.me\/([\w]+)/i);
-  if (telegramMatch) {
-    return telegramMatch[0].startsWith('@') ? telegramMatch[0] : `@${telegramMatch[1]}`;
-  }
-  
-  return '';
-}
+
 
 /**
  * Форматирует номер телефона
@@ -92,17 +79,31 @@ function formatPhone(phone: string | null, mobile: string | null): string {
 }
 
 /**
- * Получает контактную информацию по ContactId из ATI API
+ * Получает контактную информацию по ContactId из БД (с Telegram) или из API
  */
 async function getContactInfo(contactId: number): Promise<{ phone: string; telegram: string; name: string }> {
   try {
+    // Сначала пытаемся получить из белого списка (там есть Telegram)
+    const { getWhitelistedLogisticians } = await import('../database.js');
+    const logisticians = await getWhitelistedLogisticians();
+    const logist = logisticians.find(l => l.ati_id === contactId);
+    
+    if (logist) {
+      return {
+        name: logist.name,
+        phone: logist.phone || 'Не указан',
+        telegram: logist.telegram || '',
+      };
+    }
+    
+    // Если не нашли в белом списке, получаем из API (без Telegram)
     const contact = await getContactById(contactId);
     
     if (contact) {
       return {
         name: contact.name || `Контакт ${contactId}`,
         phone: formatPhone(contact.phone, contact.mobile),
-        telegram: extractTelegram(contact.note),
+        telegram: '',
       };
     }
   } catch (error) {
@@ -235,7 +236,7 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
   lines.push(`   📞 ${escapeHtml(contact.phone)}`);
   
   if (contact.telegram) {
-    lines.push(`   💬 ${escapeHtml(contact.telegram)}`);
+    lines.push(`   ⌯⌲ ${escapeHtml(contact.telegram)}`);
   }
   
   // Если есть второй контакт
@@ -245,7 +246,7 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
     lines.push(`   ${escapeHtml(contact2.name)}`);
     lines.push(`   📞 ${escapeHtml(contact2.phone)}`);
     if (contact2.telegram) {
-      lines.push(`   💬 ${escapeHtml(contact2.telegram)}`);
+      lines.push(`   ⌯⌲ ${escapeHtml(contact2.telegram)}`);
     }
   }
   

@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addLogistButton = document.getElementById('add-logist-button');
     const logistAtiIdInput = document.getElementById('logist-ati-id');
     const logistNameInput = document.getElementById('logist-name');
+    const updateContactsButton = document.getElementById('update-contacts-button');
     
     // Грузы на публикацию
     const pendingLoadsList = document.getElementById('pending-loads-list');
@@ -140,12 +141,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         logisticiansList.innerHTML = `
             <ul class="styled-list">
-                ${logisticians.map(l => `
-                    <li>
-                        <span><strong>${l.name}</strong> (ATI ID: ${l.ati_id})</span>
-                        <button class="delete-btn" data-id="${l.id}">🗑️ Удалить</button>
-                    </li>
-                `).join('')}
+                ${logisticians.map(l => {
+                    const phone = l.phone ? `<br>📞 ${l.phone}` : '';
+                    const telegram = l.telegram ? `<br>⌯⌲ ${l.telegram}` : '';
+                    
+                    return `
+                        <li>
+                            <div>
+                                <strong>${l.name}</strong> (ATI ID: ${l.ati_id})
+                                ${phone}
+                                ${telegram}
+                            </div>
+                            <button class="delete-btn" data-id="${l.id}">🗑️ Удалить</button>
+                        </li>
+                    `;
+                }).join('')}
             </ul>
         `;
     }
@@ -193,6 +203,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    updateContactsButton.addEventListener('click', async () => {
+        updateContactsButton.disabled = true;
+        updateContactsButton.textContent = '⏳ Обновление...';
+        try {
+            await fetchWithAuth('/api/logisticians/update-contacts', {
+                method: 'POST'
+            });
+            await loadLogisticians();
+            alert('Контактная информация обновлена!');
+        } catch (error) {
+            // Error is handled in fetchWithAuth
+        } finally {
+            updateContactsButton.disabled = false;
+            updateContactsButton.textContent = '🔄 Обновить контакты';
+        }
+    });
+
     // --- Contacts Management ---
     async function loadContacts() {
         if (contactsCache) {
@@ -209,6 +236,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function getContactInfoWithTelegram(contactId) {
+        // Сначала пытаемся получить из белого списка логистов (там есть Telegram)
+        try {
+            const logisticians = await fetchWithAuth('/api/logisticians');
+            const logist = logisticians.find(l => l.ati_id === contactId);
+            
+            if (logist) {
+                return {
+                    name: logist.name,
+                    phone: logist.phone || 'Не указан',
+                    telegram: logist.telegram || ''
+                };
+            }
+        } catch (error) {
+            console.error('Ошибка при получении логиста:', error);
+        }
+        
+        // Если не нашли в белом списке, возвращаем базовую информацию
+        return {
+            name: `Контакт ${contactId}`,
+            phone: 'Не указан',
+            telegram: ''
+        };
+    }
+
     function getContactInfo(contactId, contacts) {
         const contact = contacts.find(c => c.id === contactId);
         if (!contact) {
@@ -219,19 +271,11 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        // Извлекаем Telegram из примечания
-        let telegram = '';
-        if (contact.note) {
-            const telegramMatch = contact.note.match(/@[\w]+|t\.me\/([\w]+)/i);
-            if (telegramMatch) {
-                telegram = telegramMatch[0].startsWith('@') ? telegramMatch[0] : `@${telegramMatch[1]}`;
-            }
-        }
-
+        // API не содержит Telegram, возвращаем только имя и телефон
         return {
             name: contact.name || `Контакт ${contactId}`,
             phone: contact.mobile || contact.phone || 'Не указан',
-            telegram: telegram
+            telegram: '' // Telegram берем только из белого списка
         };
     }
 
@@ -251,13 +295,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderPendingLoads(loads, contacts) {
+    async function renderPendingLoads(loads, contacts) {
         if (!loads || loads.length === 0) {
             pendingLoadsList.innerHTML = '<p>Нет грузов, ожидающих публикации.</p>';
             return;
         }
 
-        pendingLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'pending', contacts)).join('');
+        const cards = await Promise.all(loads.map(load => createLoadCard(load, 'pending', contacts)));
+        pendingLoadsList.innerHTML = cards.join('');
     }
 
     pendingLoadsList.addEventListener('click', async (event) => {
@@ -330,13 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderRejectedLoads(loads, contacts) {
+    async function renderRejectedLoads(loads, contacts) {
         if (!loads || loads.length === 0) {
             rejectedLoadsList.innerHTML = '<p>Нет отклоненных грузов.</p>';
             return;
         }
 
-        rejectedLoadsList.innerHTML = loads.map(load => createLoadCard(load, 'rejected', contacts)).join('');
+        const cards = await Promise.all(loads.map(load => createLoadCard(load, 'rejected', contacts)));
+        rejectedLoadsList.innerHTML = cards.join('');
     }
 
     rejectedLoadsList.addEventListener('click', async (event) => {
@@ -390,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Helper Functions ---
-    function createLoadCard(load, type, contacts = []) {
+    async function createLoadCard(load, type, contacts = []) {
         const topics = [
             { id: null, name: 'General' },
             { id: 115, name: 'Загрузки вся РФ' },
@@ -410,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cargo = getCargo(load);
         const transport = getTransport(load);
         const price = getPrice(load);
-        const contact = getContactDisplay(load, contacts);
+        const contact = await getContactDisplay(load);
 
         let actionsHTML = '';
         if (type === 'pending') {
@@ -513,23 +559,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return `💰 Ставка: ${price}`;
     }
 
-    function getContactDisplay(load, contacts) {
-        if (!contacts || contacts.length === 0) {
-            return `👤 Контакты: ID ${load.ContactId1}${load.ContactId2 ? `, ${load.ContactId2}` : ''}`;
-        }
-
-        const contact1 = getContactInfo(load.ContactId1, contacts);
+    async function getContactDisplay(load) {
+        // Получаем информацию из белого списка (с Telegram)
+        const contact1 = await getContactInfoWithTelegram(load.ContactId1);
         let result = `👤 Контакты:\n   ${contact1.name}\n   📞 ${contact1.phone}`;
         
         if (contact1.telegram) {
-            result += `\n   💬 ${contact1.telegram}`;
+            result += `\n   ⌯⌲ ${contact1.telegram}`;
         }
 
         if (load.ContactId2) {
-            const contact2 = getContactInfo(load.ContactId2, contacts);
+            const contact2 = await getContactInfoWithTelegram(load.ContactId2);
             result += `\n\n   ${contact2.name}\n   📞 ${contact2.phone}`;
             if (contact2.telegram) {
-                result += `\n   💬 ${contact2.telegram}`;
+                result += `\n   ⌯⌲ ${contact2.telegram}`;
             }
         }
 

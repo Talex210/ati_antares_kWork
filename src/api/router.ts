@@ -15,6 +15,7 @@ import {
   getRejectedLoads,
   restoreRejectedLoad,
   deleteRejectedLoad,
+  updateLogisticianContactInfo,
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
@@ -58,6 +59,21 @@ export function createApiRouter(bot: TelegramBot) {
       res.json(logisticians);
     } catch (error) {
       res.status(500).json({ error: 'Ошибка сервера при получении списка логистов.' });
+    }
+  });
+
+  /**
+   * POST /api/logisticians/update-contacts
+   * Обновляет контактную информацию (телефон и Telegram) всех логистов из ATI API.
+   */
+  apiRouter.post('/logisticians/update-contacts', async (req: Request, res: Response) => {
+    try {
+      const { updateLogisticianContactInfo } = await import('../database.js');
+      await updateLogisticianContactInfo();
+      res.status(200).json({ message: 'Контактная информация обновлена.' });
+    } catch (error) {
+      console.error('❌ Ошибка при обновлении контактов:', error);
+      res.status(500).json({ error: 'Ошибка сервера при обновлении контактов.' });
     }
   });
 
