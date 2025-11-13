@@ -220,6 +220,28 @@ export function createApiRouter(bot: TelegramBot) {
   });
 
   /**
+   * POST /api/cities
+   * Получает информацию о городах по их ID.
+   */
+  apiRouter.post('/cities', async (req: Request, res: Response) => {
+    try {
+      const { ids } = req.body;
+      
+      if (!Array.isArray(ids)) {
+        return res.status(400).json({ error: 'Ожидается массив ids.' });
+      }
+      
+      const { getCitiesByIds } = await import('../ati_api.js');
+      const cities = await getCitiesByIds(ids);
+      
+      res.json(cities);
+    } catch (error) {
+      console.error('❌ Ошибка при получении городов:', error);
+      res.status(500).json({ error: 'Ошибка сервера при получении городов.' });
+    }
+  });
+
+  /**
    * POST /api/publish
    * Публикует груз в Telegram.
    * Принимает loadId (обязательно) и topicId (опционально).

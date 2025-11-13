@@ -520,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         const dateStr = getDateString(load);
-        const route = getRoute(load);
+        const route = await getRoute(load);
         const cargo = getCargo(load);
         const transport = getTransport(load);
         const price = getPrice(load);
@@ -582,9 +582,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return '📅 Дата: н/д';
     }
 
-    function getRoute(load) {
-        const from = load.Loading?.CityId || 'н/д';
-        const to = load.Unloading?.CityId || 'н/д';
+    // Кэш городов
+    const citiesCache = new Map();
+
+    async function getCityName(cityId) {
+        if (!cityId) return 'н/д';
+        
+        // Проверяем кэш
+        if (citiesCache.has(cityId)) {
+            return citiesCache.get(cityId);
+        }
+        
+        try {
+            const cities = await fetchWithAuth('/api/cities', {
+                method: 'POST',
+                body: JSON.stringify({ ids: [cityId] })
+            });
+            
+            if (cities && cities.length > 0) {
+                const cityName = cities[0].clarified_name || cities[0].name;
+                citiesCache.set(cityId, cityName);
+                return cityName;
+            }
+        } catch (error) {
+            console.error(`Ошибка при получении города ${cityId}:`, error);
+        }
+        
+        return `${cityId}`;
+    }
+
+    async function getRoute(load) {
+        const fromId = load.Loading?.CityId;
+        const toId = load.Unloading?.CityId;
+        
+        const from = fromId ? await getCityName(fromId) : 'н/д';
+        const to = toId ? await getCityName(toId) : 'н/д';
+        
         const distance = load.Distance ? ` (${load.Distance} км)` : '';
         return `📍 Маршрут: ${from} → ${to}${distance}`;
     }

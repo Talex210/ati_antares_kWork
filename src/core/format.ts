@@ -1,7 +1,7 @@
 // src/core/format.ts
 
 import { Load } from './types.js';
-import { getContactById, AtiContact } from '../ati_api.js';
+import { getContactById, AtiContact, getCityName } from '../ati_api.js';
 
 /**
  * Словарь типов готовности груза
@@ -160,8 +160,12 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
   lines.push(dateStr);
   
   // 2. МАРШРУТ
-  const fromCity = load.Loading?.CityId || 'н/д';
-  const toCity = load.Unloading?.CityId || 'н/д';
+  const fromCityId = load.Loading?.CityId;
+  const toCityId = load.Unloading?.CityId;
+  
+  const fromCity = fromCityId ? await getCityName(fromCityId) : 'н/д';
+  const toCity = toCityId ? await getCityName(toCityId) : 'н/д';
+  
   const fromStreet = load.Loading?.Street ? ` (${escapeHtml(load.Loading.Street)})` : '';
   const toStreet = load.Unloading?.Street ? ` (${escapeHtml(load.Unloading.Street)})` : '';
   
