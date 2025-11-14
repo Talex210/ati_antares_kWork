@@ -2,43 +2,12 @@
 
 import { Load } from './types.js';
 import { getContactById, AtiContact, getCityName } from '../ati_api.js';
-
-/**
- * Словарь типов готовности груза
- */
-const DATE_TYPES: Record<number, string> = {
-  0: '🟢 Готов к загрузке',
-  1: '📅 С даты по дату',
-  2: '🔄 Постоянно',
-  3: '❓ Груза нет, запрос ставки',
-};
-
-/**
- * Словарь валют
- */
-const CURRENCIES: Record<number, string> = {
-  1: '₽', // Рубль
-  2: '$', // Доллар
-  3: '€', // Евро
-  4: '₴', // Гривна
-  5: '₸', // Тенге
-};
-
-/**
- * Словарь типов транспорта (примерные значения)
- */
-const CAR_TYPES: Record<number, string> = {
-  1: 'Тент',
-  2: 'Реф',
-  3: 'Изотерм',
-  4: 'Бортовой',
-  5: 'Контейнеровоз',
-  6: 'Автовоз',
-  7: 'Цистерна',
-  8: 'Самосвал',
-  9: 'Низкорамник',
-  10: 'Фургон',
-};
+import { 
+  CURRENCIES, 
+  DATE_TYPES, 
+  getCarTypeName, 
+  getLoadingTypeName 
+} from './dictionaries.js';
 
 /**
  * Экранирует специальные символы HTML для Telegram
@@ -188,7 +157,14 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
   }
   
   // 4. ТРАНСПОРТ
-  const carType = CAR_TYPES[load.Transport?.CarType || 1] || 'Не указан';
+  const carTypeValue = load.Transport?.CarType;
+  
+  // Логируем странные значения для отладки
+  if (carTypeValue && typeof carTypeValue === 'number' && carTypeValue > 100) {
+    console.warn(`⚠️ Странное значение CarType: ${carTypeValue} для груза ${load.LoadNumber}`);
+  }
+  
+  const carType = getCarTypeName(carTypeValue);
   const trucksQty = load.Transport?.TrucksQuantity || 1;
   
   let transportStr = `🚛 <b>Транспорт:</b> ${carType}`;
@@ -196,14 +172,23 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
     transportStr += ` x${trucksQty}`;
   }
   
-  // Температурный режим
-  if (load.Transport?.TemperatureFrom !== undefined || load.Transport?.TemperatureTo !== undefined) {
-    const tempFrom = load.Transport.TemperatureFrom || 0;
-    const tempTo = load.Transport.TemperatureTo || 0;
-    transportStr += ` 🌡 ${tempFrom}°C...${tempTo}°C`;
-  }
-  
   lines.push(transportStr);
+  
+  // Способ загрузки/разгрузки
+  const loadingType = getLoadingTypeName(load.Transport?.LoadingType);
+  const unloadingType = getLoadingTypeName(load.Transport?.UnloadingType);
+  
+  if (loadingType || unloadingType) {
+    let loadingStr = '   📦 ';
+    if (loadingType) {
+      loadingStr += `Загрузка: ${loadingType}`;
+    }
+    if (unloadingType) {
+      if (loadingType) loadingStr += ' | ';
+      loadingStr += `Разгрузка: ${unloadingType}`;
+    }
+    lines.push(loadingStr);
+  }
   
   // 5. СТАВКА
   const currency = CURRENCIES[load.Payment?.CurrencyId || 1] || '₽';

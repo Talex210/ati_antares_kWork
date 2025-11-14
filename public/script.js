@@ -674,6 +674,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const transport = getTransport(load);
         const price = getPrice(load);
         const contact = await getContactDisplay(load);
+        
+        // Примечание к грузу (если есть и короткое)
+        let noteStr = '';
+        if (load.Note && load.Note.length < 100) {
+            noteStr = `<p style="color: #666; font-size: 0.9em;">💬 ${load.Note}</p>`;
+        }
 
         let actionsHTML = '';
         if (type === 'pending') {
@@ -697,7 +703,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>${dateStr}</p>
                     <p><strong>${route}</strong></p>
                     <p>${cargo}</p>
-                    <p>${transport}</p>
+                    ${noteStr}
+                    <p style="white-space: pre-line;">${transport}</p>
                     <p><strong>${price}</strong></p>
                     <p style="color: #666; font-size: 0.9em; white-space: pre-line;">${contact}</p>
                 </div>
@@ -778,15 +785,90 @@ document.addEventListener('DOMContentLoaded', () => {
         return `📦 Характер груза: ${type} - ${weight} т / ${volume} м³`;
     }
 
+    // Декодирование битовой маски CarType
+    function decodeCarTypeBitmask(carType) {
+        const types = [];
+        for (let bit = 0; bit < 64; bit++) {
+            const mask = Math.pow(2, bit);
+            if ((carType & mask) !== 0) {
+                types.push(bit + 1);
+            }
+        }
+        return types;
+    }
+
     function getTransport(load) {
         const carTypes = {
             1: 'Тент', 2: 'Реф', 3: 'Изотерм', 4: 'Бортовой',
             5: 'Контейнеровоз', 6: 'Автовоз', 7: 'Цистерна',
-            8: 'Самосвал', 9: 'Низкорамник', 10: 'Фургон'
+            8: 'Самосвал', 9: 'Низкорамник', 10: 'Фургон',
+            11: 'Автобус', 12: 'Манипулятор', 13: 'Эвакуатор',
+            14: 'Автокран', 15: 'Бетоносмеситель', 16: 'Бетононасос',
+            17: 'Зерновоз', 18: 'Лесовоз', 19: 'Скотовоз',
+            20: 'Трал', 21: 'Автотранспортер', 22: 'Негабарит',
+            30: 'Негабарит' // Реальный тип из API
         };
-        const carType = carTypes[load.Transport?.CarType] || 'Не указан';
+        
+        const loadingTypes = {
+            0: '', 1: 'Задняя', 2: 'Боковая', 3: 'Верхняя',
+            4: 'Полная растентовка', 5: 'Со снятием стоек',
+            6: 'Гидроборт', 7: 'Без ворот', 8: 'Аппарели', 9: 'Коники'
+        };
+        
+        let result = '';
+        let carType = 'Не указан';
+        const carTypeValue = load.Transport?.CarType;
+        
+        if (carTypeValue && typeof carTypeValue === 'number') {
+            // Простой ID (1-22, 30)
+            if ((carTypeValue > 0 && carTypeValue <= 22) || carTypeValue === 30) {
+                carType = carTypes[carTypeValue] || 'Не указан';
+            }
+            // Битовая маска (больше 22 и не 30)
+            else if (carTypeValue > 22 && carTypeValue !== 30) {
+                const types = decodeCarTypeBitmask(carTypeValue);
+                const validTypes = types.filter(t => (t > 0 && t <= 22) || t === 30);
+                
+                if (validTypes.length > 0) {
+                    // Если много типов (больше 3), показываем обобщенное название
+                    if (validTypes.length > 3) {
+                        if (validTypes.includes(22) || validTypes.includes(30)) {
+                            carType = 'Негабарит';
+                        } else {
+                            const closedTypes = [1, 2, 3, 10];
+                            if (validTypes.every(t => closedTypes.includes(t))) {
+                                carType = 'Закрытый тип';
+                            } else {
+                                carType = 'Различные типы';
+                            }
+                        }
+                    } else {
+                        // 1-3 типа, перечисляем
+                        carType = validTypes.map(t => carTypes[t]).filter(Boolean).join(', ');
+                    }
+                }
+            }
+        }
+        
         const qty = load.Transport?.TrucksQuantity || 1;
-        return `🚛 Транспорт: ${carType}${qty > 1 ? ` x${qty}` : ''}`;
+        result = `🚛 Транспорт: ${carType}${qty > 1 ? ` x${qty}` : ''}`;
+        
+        // Способ загрузки/разгрузки
+        const loadingType = loadingTypes[load.Transport?.LoadingType] || '';
+        const unloadingType = loadingTypes[load.Transport?.UnloadingType] || '';
+        
+        if (loadingType || unloadingType) {
+            result += '\n   📦 ';
+            if (loadingType) {
+                result += `Загрузка: ${loadingType}`;
+            }
+            if (unloadingType) {
+                if (loadingType) result += ' | ';
+                result += `Разгрузка: ${unloadingType}`;
+            }
+        }
+        
+        return result;
     }
 
     function getPrice(load) {
@@ -802,8 +884,14 @@ document.addEventListener('DOMContentLoaded', () => {
             price = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
         }
         
+        // Торг
         if (load.Payment?.Torg) {
             price += ' (торг)';
+        }
+        
+        // Предоплата
+        if (load.Payment?.PrepayPercent) {
+            price += ` | Предоплата ${load.Payment.PrepayPercent}%`;
         }
         
         return `💰 Ставка: ${price}`;

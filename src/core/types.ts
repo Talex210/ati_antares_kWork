@@ -50,9 +50,11 @@ export interface Load {
   
   // Транспорт
   Transport: {
-    CarType: number; // Тип транспорта
+    CarType: number | number[]; // Тип транспорта (может быть массивом)
     LoadingType?: number; // Тип загрузки
+    LoadingLogicalOperator?: string; // Логический оператор для загрузки
     UnloadingType?: number; // Тип разгрузки
+    UnloadingLogicalOperator?: string; // Логический оператор для разгрузки
     TrucksQuantity?: number; // Количество машин
     TemperatureFrom?: number; // Температура от
     TemperatureTo?: number; // Температура до
