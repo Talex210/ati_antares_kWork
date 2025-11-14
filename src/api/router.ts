@@ -205,6 +205,26 @@ export function createApiRouter(bot: TelegramBot) {
   });
 
   /**
+   * POST /api/rescan-loads
+   * Принудительно запускает пересканирование грузов из ATI API.
+   */
+  apiRouter.post('/rescan-loads', async (req: Request, res: Response) => {
+    try {
+      // Запускаем пересканирование в фоне
+      pollLoads().catch(error => {
+        console.error('❌ Ошибка при ручном пересканировании:', error);
+      });
+      
+      res.status(200).json({ 
+        message: 'Пересканирование грузов запущено.' 
+      });
+    } catch (error) {
+      console.error('❌ Ошибка при запуске пересканирования:', error);
+      res.status(500).json({ error: 'Ошибка сервера при запуске пересканирования.' });
+    }
+  });
+
+  /**
    * GET /api/contacts
    * Получает список всех контактов из ATI API.
    */

@@ -418,9 +418,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshLoadsButton.addEventListener('click', async () => {
         refreshLoadsButton.disabled = true;
-        refreshLoadsButton.textContent = '⏳ Обновление...';
+        refreshLoadsButton.textContent = '⏳ Сканирование...';
         try {
+            // Запускаем пересканирование грузов
+            await fetchWithAuth('/api/rescan-loads', {
+                method: 'POST'
+            });
+            
+            // Ждем 2 секунды, чтобы дать время на обработку
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Обновляем список
             await loadPendingLoads();
+            alert('Пересканирование завершено!');
+        } catch (error) {
+            // Error is handled in fetchWithAuth
         } finally {
             refreshLoadsButton.disabled = false;
             refreshLoadsButton.textContent = '🔄 Обновить';
