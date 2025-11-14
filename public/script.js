@@ -348,19 +348,156 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Pending Loads Management ---
+    let allPendingLoads = []; // Хранилище всех грузов
+    let selectedLogisticians = new Set(); // Выбранные логисты для фильтрации (пустой = показываем все)
+
     async function loadPendingLoads() {
         pendingLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
         try {
-            // Загружаем контакты и грузы параллельно
-            const [loads, contacts] = await Promise.all([
+            // Загружаем контакты, грузы и логистов параллельно
+            const [loads, contacts, logisticians] = await Promise.all([
                 fetchWithAuth('/api/pending-loads'),
-                loadContacts()
+                loadContacts(),
+                fetchWithAuth('/api/logisticians')
             ]);
+            
+            allPendingLoads = loads;
+            renderLogisticiansFilter(loads, logisticians);
             renderPendingLoads(loads, contacts);
         } catch (error) {
             console.error('Ошибка при загрузке ожидающих грузов:', error);
             pendingLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список грузов.</p>';
         }
+    }
+
+    function renderLogisticiansFilter(loads, logisticians) {
+        const logisticianFilter = document.getElementById('logisticians-filter');
+        
+        if (!logisticians || logisticians.length === 0) {
+            logisticianFilter.innerHTML = '<p style="color: #999; font-size: 14px;">Нет логистов в белом списке</p>';
+            return;
+        }
+
+        // Подсчитываем количество грузов для каждого логиста
+        const logistCounts = {};
+        logisticians.forEach(l => {
+            logistCounts[l.ati_id] = loads.filter(load => 
+                load.ContactId1 === l.ati_id || load.ContactId2 === l.ati_id
+            ).length;
+        });
+
+        // По умолчанию ничего не выбрано (показываем все)
+        const totalLoads = loads.length;
+        const allChecked = selectedLogisticians.size === logisticians.length;
+
+        logisticianFilter.innerHTML = `
+            <label class="filter-checkbox ${allChecked ? 'checked' : ''}" data-logist-id="all">
+                <input type="checkbox" ${allChecked ? 'checked' : ''}>
+                <span class="filter-checkbox-label">Все</span>
+                <span class="filter-checkbox-count">(${totalLoads})</span>
+            </label>
+            ${logisticians.map(l => {
+                const count = logistCounts[l.ati_id] || 0;
+                const isChecked = selectedLogisticians.has(l.ati_id);
+                return `
+                    <label class="filter-checkbox ${isChecked ? 'checked' : ''}" data-logist-id="${l.ati_id}">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''}>
+                        <span class="filter-checkbox-label">${l.name}</span>
+                        <span class="filter-checkbox-count">(${count})</span>
+                    </label>
+                `;
+            }).join('')}
+        `;
+
+        // Добавляем обработчики событий
+        logisticianFilter.querySelectorAll('.filter-checkbox').forEach(label => {
+            label.addEventListener('click', (e) => {
+                if (e.target.tagName === 'INPUT') return; // Пропускаем клик на чекбокс
+                
+                const checkbox = label.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                handleFilterChange(label.dataset.logistId, checkbox.checked);
+            });
+
+            const checkbox = label.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', (e) => {
+                handleFilterChange(label.dataset.logistId, e.target.checked);
+            });
+        });
+    }
+
+    function handleFilterChange(logistId, isChecked) {
+        if (logistId === 'all') {
+            // Переключаем все чекбоксы
+            const allCheckboxes = document.querySelectorAll('#logisticians-filter .filter-checkbox');
+            
+            if (isChecked) {
+                // Выбираем все
+                allCheckboxes.forEach(label => {
+                    const checkbox = label.querySelector('input[type="checkbox"]');
+                    checkbox.checked = true;
+                    label.classList.add('checked');
+                    
+                    const id = label.dataset.logistId;
+                    if (id !== 'all') {
+                        selectedLogisticians.add(parseInt(id));
+                    }
+                });
+            } else {
+                // Снимаем все (показываем все грузы)
+                allCheckboxes.forEach(label => {
+                    const checkbox = label.querySelector('input[type="checkbox"]');
+                    checkbox.checked = false;
+                    label.classList.remove('checked');
+                });
+                selectedLogisticians.clear();
+            }
+        } else {
+            const logistIdNum = parseInt(logistId);
+            const label = document.querySelector(`[data-logist-id="${logistId}"]`);
+            
+            if (isChecked) {
+                selectedLogisticians.add(logistIdNum);
+                label.classList.add('checked');
+            } else {
+                selectedLogisticians.delete(logistIdNum);
+                label.classList.remove('checked');
+            }
+
+            // Обновляем чекбокс "Все"
+            const allCheckbox = document.querySelector('[data-logist-id="all"] input');
+            const allLabel = document.querySelector('[data-logist-id="all"]');
+            const totalLogists = document.querySelectorAll('#logisticians-filter .filter-checkbox').length - 1;
+            
+            if (selectedLogisticians.size === totalLogists) {
+                allCheckbox.checked = true;
+                allLabel.classList.add('checked');
+            } else {
+                allCheckbox.checked = false;
+                allLabel.classList.remove('checked');
+            }
+        }
+
+        // Перерисовываем список грузов с учетом фильтра
+        filterAndRenderLoads();
+    }
+
+    async function filterAndRenderLoads() {
+        const contacts = await loadContacts();
+        
+        // Если ничего не выбрано - показываем все грузы
+        if (selectedLogisticians.size === 0) {
+            renderPendingLoads(allPendingLoads, contacts);
+            return;
+        }
+        
+        // Фильтруем грузы по выбранным логистам
+        const filteredLoads = allPendingLoads.filter(load => 
+            selectedLogisticians.has(load.ContactId1) || 
+            (load.ContactId2 && selectedLogisticians.has(load.ContactId2))
+        );
+
+        renderPendingLoads(filteredLoads, contacts);
     }
 
     async function renderPendingLoads(loads, contacts) {
