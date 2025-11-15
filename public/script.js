@@ -24,6 +24,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const rejectedLoadsList = document.getElementById('rejected-loads-list');
     const refreshRejectedButton = document.getElementById('refresh-rejected-button');
 
+    // --- Bulk Selection ---
+    const selectedLoads = new Set();
+    const bulkActions = document.getElementById('bulk-actions');
+    const bulkPublishButton = document.getElementById('bulk-publish-button');
+    const bulkRejectButton = document.getElementById('bulk-reject-button');
+    const deselectContainer = document.getElementById('deselect-container');
+    const deselectCheckbox = document.getElementById('deselect-all-checkbox');
+
     // Кэш контактов
     let contactsCache = null;
 
@@ -40,6 +48,17 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
             
+            // Показываем или скрываем боковые кнопки и чекбокс
+            if (tabName === 'pending') {
+                bulkActions.style.display = 'block';
+                if (selectedLoads.size > 0) {
+                    deselectContainer.style.display = 'block';
+                }
+            } else {
+                bulkActions.style.display = 'none';
+                deselectContainer.style.display = 'none';
+            }
+
             // Загружаем данные для вкладки
             if (tabName === 'logisticians') {
                 loadLogisticians();
@@ -103,7 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function showMainContent() {
         authSection.style.display = 'none';
         mainContent.style.display = 'block';
+        bulkActions.style.display = 'none'; // Hide on startup
         loadLogisticians();
+        updateBulkButtonsState();
     }
 
     loginButton.addEventListener('click', () => {
@@ -522,7 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 } catch (error) {
                     target.disabled = false;
-                    target.textContent = '✅ Опубликовать';
+                    target.textContent = '⌯⌲ Опубликовать';
                     // Error is handled in fetchWithAuth
                 }
             }
@@ -556,6 +577,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Event listener for checkboxes
+    pendingLoadsList.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target.classList.contains('load-select-checkbox')) {
+            const loadId = parseInt(target.dataset.loadId, 10);
+            const loadCard = target.closest('.load-card');
+
+            if (target.checked) {
+                selectedLoads.add(loadId);
+                loadCard.classList.add('selected');
+            } else {
+                selectedLoads.delete(loadId);
+                loadCard.classList.remove('selected');
+            }
+            updateBulkButtonsState();
+        }
+    });
+
+    // Обработчик для чекбокса "Снять все выделения"
+    if (deselectContainer) {
+        deselectContainer.addEventListener('click', (event) => {
+            // Снимаем все выделения
+            const loadsToDeselect = Array.from(selectedLoads);
+            
+            loadsToDeselect.forEach(loadId => {
+                const loadCheckbox = pendingLoadsList.querySelector(`.load-select-checkbox[data-load-id="${loadId}"]`);
+                if (loadCheckbox) {
+                    loadCheckbox.checked = false;
+                    selectedLoads.delete(loadId);
+                    const loadCard = loadCheckbox.closest('.load-card');
+                    if (loadCard) {
+                        loadCard.classList.remove('selected');
+                    }
+                }
+            });
+            
+            // Обновляем состояние кнопок и скрываем чекбокс
+            updateBulkButtonsState();
+            
+            // Убеждаемся что чекбокс не отмечен
+            if (deselectCheckbox) {
+                deselectCheckbox.checked = false;
+            }
+        });
+    }
 
     refreshLoadsButton.addEventListener('click', async () => {
         refreshLoadsButton.disabled = true;
@@ -699,6 +766,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    function updateBulkButtonsState() {
+        const isDisabled = selectedLoads.size === 0;
+        bulkPublishButton.disabled = isDisabled;
+        bulkRejectButton.disabled = isDisabled;
+        
+        // Показываем/скрываем чекбокс снятия выделения
+        if (selectedLoads.size > 0) {
+            deselectContainer.style.display = 'block';
+        } else {
+            deselectContainer.style.display = 'none';
+        }
+    }
     
     async function createLoadCard(load, type, contacts = []) {
         const topics = [
@@ -734,7 +814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <select class="topic-select">
                     ${topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
                 </select>
-                <button class="publish-btn">✅ Опубликовать</button>
+                <button class="publish-btn">⌯⌲ Опубликовать</button>
                 <button class="reject-btn">❌ Отклонить</button>
             `;
         } else if (type === 'rejected') {
@@ -744,8 +824,15 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
+        const checkboxHTML = type === 'pending' ? `
+            <div class="load-card-checkbox">
+                <input type="checkbox" class="load-select-checkbox" data-load-id="${load.Id}">
+            </div>
+        ` : '';
+
         return `
             <div class="load-card" data-load-id="${load.Id}">
+                ${checkboxHTML}
                 <div class="load-details">
                     <p>${dateStr}</p>
                     <p><strong>${route}</strong></p>
