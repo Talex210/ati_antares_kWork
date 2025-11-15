@@ -349,7 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Pending Loads Management ---
     let allPendingLoads = []; // Хранилище всех грузов
-    let selectedLogisticians = new Set(); // Выбранные логисты для фильтрации (пустой = показываем все)
+    // Загружаем сохраненный фильтр из localStorage
+    const savedFilter = localStorage.getItem('selectedLogisticiansFilter');
+    let selectedLogisticians = new Set(savedFilter ? JSON.parse(savedFilter) : []); // Выбранные логисты для фильтрации (пустой = показываем все)
 
     async function loadPendingLoads() {
         pendingLoadsList.innerHTML = '<p class="loading">Загрузка...</p>';
@@ -363,7 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             allPendingLoads = loads;
             renderLogisticiansFilter(loads, logisticians);
-            renderPendingLoads(loads, contacts);
+            // Применяем фильтр сразу после загрузки
+            await filterAndRenderLoads();
         } catch (error) {
             console.error('Ошибка при загрузке ожидающих грузов:', error);
             pendingLoadsList.innerHTML = '<p style="color: red;">Не удалось загрузить список грузов.</p>';
@@ -388,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // По умолчанию ничего не выбрано (показываем все)
         const totalLoads = loads.length;
-        const allChecked = selectedLogisticians.size === logisticians.length;
+        const allChecked = selectedLogisticians.size > 0 && selectedLogisticians.size === logisticians.length;
 
         logisticianFilter.innerHTML = `
             <label class="filter-checkbox ${allChecked ? 'checked' : ''}" data-logist-id="all">
@@ -411,14 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Добавляем обработчики событий
         logisticianFilter.querySelectorAll('.filter-checkbox').forEach(label => {
-            label.addEventListener('click', (e) => {
-                if (e.target.tagName === 'INPUT') return; // Пропускаем клик на чекбокс
-                
-                const checkbox = label.querySelector('input[type="checkbox"]');
-                checkbox.checked = !checkbox.checked;
-                handleFilterChange(label.dataset.logistId, checkbox.checked);
-            });
-
             const checkbox = label.querySelector('input[type="checkbox"]');
             checkbox.addEventListener('change', (e) => {
                 handleFilterChange(label.dataset.logistId, e.target.checked);
@@ -427,56 +422,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleFilterChange(logistId, isChecked) {
+        const allLogistIds = Array.from(document.querySelectorAll('#logisticians-filter .filter-checkbox'))
+            .map(label => label.dataset.logistId)
+            .filter(id => id !== 'all')
+            .map(id => parseInt(id));
+
         if (logistId === 'all') {
-            // Переключаем все чекбоксы
-            const allCheckboxes = document.querySelectorAll('#logisticians-filter .filter-checkbox');
-            
             if (isChecked) {
-                // Выбираем все
-                allCheckboxes.forEach(label => {
-                    const checkbox = label.querySelector('input[type="checkbox"]');
-                    checkbox.checked = true;
-                    label.classList.add('checked');
-                    
-                    const id = label.dataset.logistId;
-                    if (id !== 'all') {
-                        selectedLogisticians.add(parseInt(id));
-                    }
-                });
+                allLogistIds.forEach(id => selectedLogisticians.add(id));
             } else {
-                // Снимаем все (показываем все грузы)
-                allCheckboxes.forEach(label => {
-                    const checkbox = label.querySelector('input[type="checkbox"]');
-                    checkbox.checked = false;
-                    label.classList.remove('checked');
-                });
                 selectedLogisticians.clear();
             }
         } else {
             const logistIdNum = parseInt(logistId);
-            const label = document.querySelector(`[data-logist-id="${logistId}"]`);
-            
             if (isChecked) {
                 selectedLogisticians.add(logistIdNum);
-                label.classList.add('checked');
             } else {
                 selectedLogisticians.delete(logistIdNum);
-                label.classList.remove('checked');
-            }
-
-            // Обновляем чекбокс "Все"
-            const allCheckbox = document.querySelector('[data-logist-id="all"] input');
-            const allLabel = document.querySelector('[data-logist-id="all"]');
-            const totalLogists = document.querySelectorAll('#logisticians-filter .filter-checkbox').length - 1;
-            
-            if (selectedLogisticians.size === totalLogists) {
-                allCheckbox.checked = true;
-                allLabel.classList.add('checked');
-            } else {
-                allCheckbox.checked = false;
-                allLabel.classList.remove('checked');
             }
         }
+
+        // Обновляем UI чекбоксов
+        document.querySelectorAll('#logisticians-filter .filter-checkbox').forEach(label => {
+            const checkbox = label.querySelector('input[type="checkbox"]');
+            const id = label.dataset.logistId;
+            
+            if (id === 'all') {
+                const allSelected = selectedLogisticians.size > 0 && selectedLogisticians.size === allLogistIds.length;
+                checkbox.checked = allSelected;
+                label.classList.toggle('checked', allSelected);
+            } else {
+                const isSelected = selectedLogisticians.has(parseInt(id));
+                checkbox.checked = isSelected;
+                label.classList.toggle('checked', isSelected);
+            }
+        });
+
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('selectedLogisticiansFilter', JSON.stringify(Array.from(selectedLogisticians)));
 
         // Перерисовываем список грузов с учетом фильтра
         filterAndRenderLoads();
@@ -485,17 +468,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function filterAndRenderLoads() {
         const contacts = await loadContacts();
         
-        // Если ничего не выбрано - показываем все грузы
-        if (selectedLogisticians.size === 0) {
-            renderPendingLoads(allPendingLoads, contacts);
-            return;
+        let filteredLoads = allPendingLoads;
+        // Если выбраны какие-то логисты - фильтруем
+        if (selectedLogisticians.size > 0) {
+            filteredLoads = allPendingLoads.filter(load => 
+                selectedLogisticians.has(load.ContactId1) || 
+                (load.ContactId2 && selectedLogisticians.has(load.ContactId2))
+            );
         }
-        
-        // Фильтруем грузы по выбранным логистам
-        const filteredLoads = allPendingLoads.filter(load => 
-            selectedLogisticians.has(load.ContactId1) || 
-            (load.ContactId2 && selectedLogisticians.has(load.ContactId2))
-        );
 
         renderPendingLoads(filteredLoads, contacts);
     }
@@ -519,19 +499,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (target.classList.contains('publish-btn')) {
             const topicSelect = loadCard.querySelector('.topic-select');
-            const topicId = parseInt(topicSelect.value, 10);
+            const topicId = topicSelect.value !== 'null' ? parseInt(topicSelect.value, 10) : null;
             
             if (confirm(`Опубликовать груз в топик "${topicSelect.options[topicSelect.selectedIndex].text}"?`)) {
                 try {
+                    target.disabled = true;
+                    target.textContent = '⏳...';
                     await fetchWithAuth('/api/publish', {
                         method: 'POST',
                         body: JSON.stringify({ loadId, topicId })
                     });
-                    loadCard.remove();
-                    alert('Груз успешно опубликован!');
-                    await loadPendingLoads();
+                    
+                    // Удаляем карточку из DOM
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        loadCard.remove();
+                        // Обновляем счетчики после удаления
+                        updateCountsAfterAction(loadId);
+                    }, 500);
+
                 } catch (error) {
-                    await loadPendingLoads();
+                    target.disabled = false;
+                    target.textContent = '✅ Опубликовать';
+                    // Error is handled in fetchWithAuth
                 }
             }
         }
@@ -539,15 +531,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('reject-btn')) {
             if (confirm('Вы уверены, что хотите отклонить этот груз?')) {
                 try {
+                    target.disabled = true;
+                    target.textContent = '⏳...';
                     await fetchWithAuth('/api/reject-load', {
                         method: 'POST',
                         body: JSON.stringify({ loadId })
                     });
-                    loadCard.remove();
-                    alert('Груз отклонен и сохранен в архив.');
-                    await loadPendingLoads();
+
+                    // Удаляем карточку из DOM
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        loadCard.remove();
+                        // Обновляем счетчики после удаления
+                        updateCountsAfterAction(loadId);
+                    }, 500);
+
                 } catch (error) {
-                    await loadPendingLoads();
+                    target.disabled = false;
+                    target.textContent = '❌ Отклонить';
+                    // Error is handled in fetchWithAuth
                 }
             }
         }
@@ -612,15 +616,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('restore-btn')) {
             if (confirm('Восстановить этот груз в очередь на публикацию?')) {
                 try {
+                    target.disabled = true;
+                    target.textContent = '⏳...';
                     await fetchWithAuth('/api/restore-load', {
                         method: 'POST',
                         body: JSON.stringify({ loadId })
                     });
-                    loadCard.remove();
-                    alert('Груз восстановлен в очередь!');
-                    await loadRejectedLoads();
+                    
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => loadCard.remove(), 500);
+
                 } catch (error) {
-                    await loadRejectedLoads();
+                    target.disabled = false;
+                    target.textContent = '♻️ Восстановить';
+                    // Error is handled in fetchWithAuth
                 }
             }
         }
@@ -628,14 +639,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('delete-forever-btn')) {
             if (confirm('Удалить этот груз навсегда? Это действие нельзя отменить!')) {
                 try {
+                    target.disabled = true;
+                    target.textContent = '⏳...';
                     await fetchWithAuth(`/api/rejected-loads/${loadId}`, {
                         method: 'DELETE'
                     });
-                    loadCard.remove();
-                    alert('Груз удален навсегда.');
-                    await loadRejectedLoads();
+
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => loadCard.remove(), 500);
+
                 } catch (error) {
-                    await loadRejectedLoads();
+                    target.disabled = false;
+                    target.textContent = '🗑️ Удалить навсегда';
+                    // Error is handled in fetchWithAuth
                 }
             }
         }
@@ -653,6 +671,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Helper Functions ---
+
+    function updateCountsAfterAction(removedLoadId) {
+        // Находим груз, который был удален
+        const removedLoadIndex = allPendingLoads.findIndex(l => l.Id == removedLoadId);
+        if (removedLoadIndex === -1) return;
+
+        const removedLoad = allPendingLoads[removedLoadIndex];
+        
+        // Удаляем его из глобального массива
+        allPendingLoads.splice(removedLoadIndex, 1);
+
+        // Обновляем общий счетчик
+        const allCountSpan = document.querySelector('[data-logist-id="all"] .filter-checkbox-count');
+        if (allCountSpan) {
+            allCountSpan.textContent = `(${allPendingLoads.length})`;
+        }
+
+        // Обновляем счетчики для затронутых логистов
+        const affectedLogistIds = [removedLoad.ContactId1, removedLoad.ContactId2].filter(Boolean);
+        
+        affectedLogistIds.forEach(logistId => {
+            const logistCountSpan = document.querySelector(`[data-logist-id="${logistId}"] .filter-checkbox-count`);
+            if (logistCountSpan) {
+                const currentCount = parseInt(logistCountSpan.textContent.replace(/\D/g, ''));
+                logistCountSpan.textContent = `(${Math.max(0, currentCount - 1)})`;
+            }
+        });
+    }
+    
     async function createLoadCard(load, type, contacts = []) {
         const topics = [
             { id: null, name: 'General' },
