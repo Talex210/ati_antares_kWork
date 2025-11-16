@@ -1144,4 +1144,55 @@ document.addEventListener('DOMContentLoaded', () => {
         modalPublishButton.disabled = false;
         modalPublishButton.textContent = 'Опубликовать';
     });
+
+    bulkRejectButton.addEventListener('click', async () => {
+        if (selectedLoads.size === 0) {
+            alert('Пожалуйста, выберите хотя бы один груз для отклонения.');
+            return;
+        }
+
+        if (!confirm(`Вы уверены, что хотите отклонить ${selectedLoads.size} выбранных грузов?`)) {
+            return;
+        }
+
+        bulkRejectButton.disabled = true;
+        bulkRejectButton.textContent = '⏳ Отклонение...';
+
+        const loadsToReject = Array.from(selectedLoads);
+        let successfulRejections = 0;
+        let failedRejections = 0;
+
+        for (const loadId of loadsToReject) {
+            try {
+                await fetchWithAuth('/api/reject-load', {
+                    method: 'POST',
+                    body: JSON.stringify({ loadId })
+                });
+                successfulRejections++;
+                // Remove the load from the UI immediately
+                const loadCard = document.querySelector(`.load-card[data-load-id="${loadId}"]`);
+                if (loadCard) {
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        loadCard.remove();
+                        updateCountsAfterAction(loadId);
+                    }, 500);
+                }
+            } catch (error) {
+                failedRejections++;
+                console.error(`Ошибка при отклонении груза ${loadId}:`, error);
+            }
+        }
+
+        alert(`Отклонение завершено.\nУспешно отклонено: ${successfulRejections}\nОшибок: ${failedRejections}`);
+        
+        selectedLoads.clear(); // Clear selected loads after bulk action
+        updateBulkButtonsState(); // Update button states
+        await loadPendingLoads(); // Refresh the list to ensure consistency
+        
+        bulkRejectButton.disabled = false;
+        bulkRejectButton.textContent = '❌ Отклонить выбранные';
+    });
 });
