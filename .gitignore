@@ -16,3 +16,5 @@ database.db
 # Ignore compiled TypeScript output
 dist/
 *.tsbuildinfo
+
+gemini_log.md

@@ -32,8 +32,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const deselectContainer = document.getElementById('deselect-container');
     const deselectButton = document.getElementById('deselect-all-button');
 
+    // --- Bulk Publish Modal Elements ---
+    const bulkPublishModal = document.getElementById('bulk-publish-modal');
+    const modalTopicSelect = document.getElementById('modal-topic-select');
+    const modalPublishButton = document.getElementById('modal-publish-button');
+    const modalCancelButton = document.getElementById('modal-cancel-button');
+
     // Кэш контактов
     let contactsCache = null;
+
+    // Глобальный массив топиков
+    const topics = [
+        { id: null, name: 'General' },
+        { id: 115, name: 'Загрузки вся РФ' },
+        { id: 107, name: 'Загрузки из Владивостока' },
+        { id: 105, name: 'Загрузки из Екатеринбурга' },
+        { id: 101, name: 'Загрузки из Казани' },
+        { id: 103, name: 'Загрузки из Москвы и МО' },
+        { id: 244, name: 'Загрузки из Набережных Челнов' },
+        { id: 113, name: 'Загрузки НЕГАБАРИТ' },
+        { id: 109, name: 'Загрузки из Самары' },
+        { id: 117, name: 'Курилка' },
+        { id: 111, name: 'Международные загрузки' }
+    ];
 
     // --- Tabs Management ---
     tabButtons.forEach(button => {
@@ -1046,4 +1067,81 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         showLogin();
     }
+
+    // --- Modal Functions ---
+    function populateModalTopicSelect() {
+        modalTopicSelect.innerHTML = topics.map(t => 
+            `<option value="${t.id}">${t.name}</option>`
+        ).join('');
+    }
+
+    function showBulkPublishModal() {
+        populateModalTopicSelect();
+        bulkPublishModal.classList.add('active');
+    }
+
+    function hideBulkPublishModal() {
+        bulkPublishModal.classList.remove('active');
+    }
+
+    // --- Event Listeners for Bulk Actions ---
+    bulkPublishButton.addEventListener('click', () => {
+        if (selectedLoads.size > 0) {
+            showBulkPublishModal();
+        } else {
+            alert('Пожалуйста, выберите хотя бы один груз для публикации.');
+        }
+    });
+
+    modalCancelButton.addEventListener('click', hideBulkPublishModal);
+
+    modalPublishButton.addEventListener('click', async () => {
+        const topicId = modalTopicSelect.value !== 'null' ? parseInt(modalTopicSelect.value, 10) : null;
+        const topicName = modalTopicSelect.options[modalTopicSelect.selectedIndex].text;
+
+        if (!confirm(`Вы уверены, что хотите опубликовать ${selectedLoads.size} груз(ов) в топик "${topicName}"?`)) {
+            return;
+        }
+
+        modalPublishButton.disabled = true;
+        modalPublishButton.textContent = '⏳ Публикация...';
+
+        const loadsToPublish = Array.from(selectedLoads);
+        let successfulPublications = 0;
+        let failedPublications = 0;
+
+        for (const loadId of loadsToPublish) {
+            try {
+                await fetchWithAuth('/api/publish', {
+                    method: 'POST',
+                    body: JSON.stringify({ loadId, topicId })
+                });
+                successfulPublications++;
+                // Remove the load from the UI immediately
+                const loadCard = document.querySelector(`.load-card[data-load-id="${loadId}"]`);
+                if (loadCard) {
+                    loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
+                    loadCard.style.opacity = '0';
+                    loadCard.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        loadCard.remove();
+                        updateCountsAfterAction(loadId);
+                    }, 500);
+                }
+            } catch (error) {
+                failedPublications++;
+                console.error(`Ошибка при публикации груза ${loadId}:`, error);
+            }
+        }
+
+        alert(`Публикация завершена.\nУспешно опубликовано: ${successfulPublications}\nОшибок: ${failedPublications}`);
+        
+        hideBulkPublishModal();
+        selectedLoads.clear(); // Clear selected loads after bulk action
+        updateBulkButtonsState(); // Update button states
+        await loadPendingLoads(); // Refresh the list to ensure consistency
+        
+        modalPublishButton.disabled = false;
+        modalPublishButton.textContent = 'Опубликовать';
+    });
 });
