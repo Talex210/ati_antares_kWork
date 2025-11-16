@@ -605,13 +605,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('load-select-checkbox')) {
             const loadId = target.dataset.loadId;
             const loadCard = target.closest('.load-card');
+            const actionButtons = loadCard.querySelectorAll('.publish-btn, .reject-btn');
 
             if (target.checked) {
                 selectedLoads.add(loadId);
                 loadCard.classList.add('selected');
+                actionButtons.forEach(btn => btn.disabled = true);
             } else {
                 selectedLoads.delete(loadId);
                 loadCard.classList.remove('selected');
+                actionButtons.forEach(btn => btn.disabled = false);
             }
             updateBulkButtonsState();
         }
@@ -819,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let actionsHTML = '';
+        let cardClass = 'load-card';
         if (type === 'pending') {
             actionsHTML = `
                 <select class="topic-select">
@@ -828,9 +832,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button class="reject-btn">❌ Отклонить</button>
             `;
         } else if (type === 'rejected') {
+            cardClass += ' load-card-rejected';
             actionsHTML = `
-                <button class="restore-btn">♻️ Восстановить</button>
-                <button class="delete-forever-btn">🗑️ Удалить навсегда</button>
+                <div class="load-actions-rejected">
+                    <button class="restore-btn">♻️ Восстановить</button>
+                    <button class="delete-forever-btn">🗑️ Удалить навсегда</button>
+                </div>
             `;
         }
 
@@ -841,7 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ` : '';
 
         return `
-            <div class="load-card" data-load-id="${load.Id}">
+            <div class="${cardClass}" data-load-id="${load.Id}">
                 ${checkboxHTML}
                 <div class="load-details">
                     <p>${dateStr}</p>
@@ -1182,7 +1189,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             selectedLoads.clear();
             updateBulkButtonsState();
-            bulkRejectButton.disabled = false;
             bulkRejectButton.textContent = '❌ Отклонить выбранные';
         }
     });

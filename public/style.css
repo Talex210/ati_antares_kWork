@@ -320,6 +320,10 @@ body {
     transition: all 0.3s;
 }
 
+.load-card-rejected {
+    grid-template-columns: 1fr 200px;
+}
+
 .load-card:hover {
     border-color: #667eea;
     box-shadow: 0 5px 20px rgba(102, 126, 234, 0.1);
@@ -367,6 +371,12 @@ body {
     min-width: 180px;
 }
 
+.load-actions-rejected {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .topic-select {
     padding: 10px;
     border: 2px solid #e0e0e0;
@@ -401,7 +411,7 @@ body {
 .reject-btn {
     background: #6c757d;
     color: white;
-    padding: 10px;
+    padding: 10px 20px;
     border: none;
     border-radius: 8px;
     font-size: 14px;
