@@ -508,6 +508,120 @@ export async function restoreRejectedLoad(atiLoadId: string): Promise<void> {
 }
 
 /**
+ * Получает несколько грузов, ожидающих публикации, по их ID.
+ * @param atiLoadIds Массив ID грузов ATI (GUID).
+ * @returns {Promise<any[]>} Массив объектов грузов.
+ */
+export async function getPendingLoadsByIds(atiLoadIds: string[]): Promise<any[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  if (atiLoadIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const placeholders = atiLoadIds.map(() => '?').join(',');
+    const rows = await db.all<{ load_data: string }[]>(
+      `SELECT load_data FROM pending_loads WHERE ati_load_id IN (${placeholders})`,
+      ...atiLoadIds
+    );
+    return rows.map(row => JSON.parse(row.load_data));
+  } catch (error) {
+    console.error(`Ошибка при получении грузов из очереди по IDs:`, error);
+    return [];
+  }
+}
+
+/**
+ * Удаляет несколько грузов из списка ожидания.
+ * @param atiLoadIds Массив ID грузов ATI (GUID).
+ */
+export async function removePendingLoads(atiLoadIds: string[]): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  if (atiLoadIds.length === 0) {
+    return;
+  }
+
+  try {
+    await db.exec('BEGIN TRANSACTION');
+    const stmt = await db.prepare('DELETE FROM pending_loads WHERE ati_load_id = ?');
+    for (const atiLoadId of atiLoadIds) {
+      await stmt.run(atiLoadId);
+    }
+    await stmt.finalize();
+    await db.exec('COMMIT');
+    console.log(`🗑️ Удалено ${atiLoadIds.length} грузов из очереди.`);
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    console.error(`Ошибка при массовом удалении грузов из очереди:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Добавляет несколько грузов в список отклоненных.
+ * @param loads Массив объектов грузов.
+ */
+export async function addRejectedLoads(loads: any[]): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  if (loads.length === 0) {
+    return;
+  }
+
+  try {
+    await db.exec('BEGIN TRANSACTION');
+    const stmt = await db.prepare('INSERT OR IGNORE INTO rejected_loads (ati_load_id, load_data) VALUES (?, ?)');
+    for (const load of loads) {
+      await stmt.run(load.Id, JSON.stringify(load));
+    }
+    await stmt.finalize();
+    await db.exec('COMMIT');
+    console.log(`🚫 Добавлено ${loads.length} грузов в список отклоненных.`);
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    console.error(`Ошибка при массовом добавлении грузов в отклоненные:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Отмечает несколько грузов как опубликованные.
+ * @param atiLoadIds Массив ID грузов ATI (GUID).
+ */
+export async function markLoadsAsPublished(atiLoadIds: string[]): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  if (atiLoadIds.length === 0) {
+    return;
+  }
+
+  try {
+    await db.exec('BEGIN TRANSACTION');
+    const stmt = await db.prepare('INSERT OR IGNORE INTO published_loads (ati_load_id) VALUES (?)');
+    for (const atiLoadId of atiLoadIds) {
+      await stmt.run(atiLoadId);
+    }
+    await stmt.finalize();
+    await db.exec('COMMIT');
+    console.log(`✅ Отмечено ${atiLoadIds.length} грузов как опубликованные.`);
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    console.error(`Ошибка при массовой отметке грузов как опубликованных:`, error);
+    throw error;
+  }
+}
+
+/**
  * Удаляет груз из списка отклоненных навсегда.
  * @param atiLoadId ID груза ATI (GUID).
  */
@@ -521,5 +635,28 @@ export async function deleteRejectedLoad(atiLoadId: string): Promise<void> {
     console.log(`🗑️ Груз с ID ${atiLoadId} удален из отклоненных навсегда.`);
   } catch (error) {
     console.error(`Ошибка при удалении груза ${atiLoadId} из отклоненных:`, error);
+  }
+}
+
+/**
+ * Удаляет несколько грузов из списка отклоненных навсегда.
+ * @param atiLoadIds Массив ID грузов ATI (GUID).
+ */
+export async function deleteRejectedLoads(atiLoadIds: string[]): Promise<void> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return;
+  }
+  if (atiLoadIds.length === 0) {
+    return;
+  }
+
+  try {
+    const placeholders = atiLoadIds.map(() => '?').join(',');
+    await db.run(`DELETE FROM rejected_loads WHERE ati_load_id IN (${placeholders})`, ...atiLoadIds);
+    console.log(`🗑️ Удалено ${atiLoadIds.length} грузов из отклоненных навсегда.`);
+  } catch (error) {
+    console.error(`Ошибка при массовом удалении грузов из отклоненных:`, error);
+    throw error;
   }
 }

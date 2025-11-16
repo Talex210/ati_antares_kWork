@@ -17,4 +17,4 @@ database.db
 dist/
 *.tsbuildinfo
 
-gemini_log.md
+@gemini_log.md

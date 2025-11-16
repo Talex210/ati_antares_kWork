@@ -16,6 +16,10 @@ import {
   restoreRejectedLoad,
   deleteRejectedLoad,
   updateLogisticianContactInfo,
+  getPendingLoadsByIds,
+  addRejectedLoads,
+  removePendingLoads,
+  markLoadsAsPublished,
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
@@ -316,6 +320,61 @@ export function createApiRouter(bot: TelegramBot) {
   });
 
   /**
+   * POST /api/publish-loads
+   * Массово публикует грузы в Telegram.
+   */
+  apiRouter.post('/publish-loads', async (req: Request, res: Response) => {
+    const { loadIds, topicId } = req.body;
+
+    if (!Array.isArray(loadIds) || loadIds.length === 0) {
+      return res.status(400).json({ error: 'Необходим массив loadIds.' });
+    }
+    if (!CHAT_ID) {
+      return res.status(500).json({ error: 'TELEGRAM_CHAT_ID не указан в .env файле.' });
+    }
+
+    try {
+      const loads = await getPendingLoadsByIds(loadIds);
+      if (loads.length === 0) {
+        return res.status(404).json({ error: 'Указанные грузы не найдены в очереди.' });
+      }
+
+      const telegramOptions: TelegramBot.SendMessageOptions = { parse_mode: 'HTML' };
+      if (topicId && typeof topicId === 'number') {
+        telegramOptions.message_thread_id = topicId;
+      }
+
+      let successfulPublications = 0;
+      let failedPublications = 0;
+
+      for (const load of loads) {
+        try {
+          const message = await formatLoadMessage(load);
+          await bot.sendMessage(CHAT_ID, message, telegramOptions);
+          successfulPublications++;
+        } catch (error) {
+          failedPublications++;
+          console.error(`❌ Ошибка при публикации груза ${load.Id} в Telegram:`, error);
+        }
+      }
+
+      // Массово обновляем базу данных
+      const publishedLoadIds = loads.map(l => l.Id);
+      await removePendingLoads(publishedLoadIds);
+      await markLoadsAsPublished(publishedLoadIds);
+
+      console.log(`✅ Массовая публикация завершена. Успешно: ${successfulPublications}, Ошибки: ${failedPublications}`);
+      res.status(200).json({
+        message: `Публикация завершена. Успешно: ${successfulPublications}, Ошибки: ${failedPublications}`,
+      });
+
+    } catch (error) {
+      console.error('❌ Ошибка при массовой публикации грузов:', error);
+      res.status(500).json({ error: 'Ошибка сервера при массовой публикации.' });
+    }
+  });
+
+  /**
    * POST /api/delete-message
    * Удаляет сообщение в Telegram.
    * Принимает messageId (обязательно) и chatId (опционально).
@@ -376,6 +435,40 @@ export function createApiRouter(bot: TelegramBot) {
     } catch (error) {
       console.error('❌ Ошибка при отклонении груза:', error);
       res.status(500).json({ error: 'Ошибка сервера при отклонении груза.' });
+    }
+  });
+
+  /**
+   * POST /api/reject-loads
+   * Массово отклоняет грузы из очереди на публикацию.
+   * Принимает { loadIds: string[] }
+   */
+  apiRouter.post('/reject-loads', async (req: Request, res: Response) => {
+    const { loadIds } = req.body;
+
+    if (!Array.isArray(loadIds) || loadIds.length === 0) {
+      return res.status(400).json({ error: 'Необходим массив loadIds.' });
+    }
+
+    try {
+      // 1. Получаем данные грузов, которые нужно отклонить
+      const loadsToReject = await getPendingLoadsByIds(loadIds);
+      if (loadsToReject.length === 0) {
+        return res.status(404).json({ error: 'Указанные грузы не найдены в очереди.' });
+      }
+
+      // 2. Добавляем их в таблицу отклоненных
+      await addRejectedLoads(loadsToReject);
+      
+      // 3. Удаляем их из очереди
+      await removePendingLoads(loadIds);
+
+      console.log(`🗑️ Массово отклонено ${loadIds.length} грузов.`);
+      res.status(200).json({ message: `Успешно отклонено ${loadIds.length} грузов.` });
+
+    } catch (error) {
+      console.error('❌ Ошибка при массовом отклонении грузов:', error);
+      res.status(500).json({ error: 'Ошибка сервера при массовом отклонении грузов.' });
     }
   });
 

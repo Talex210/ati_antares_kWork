@@ -603,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingLoadsList.addEventListener('change', (event) => {
         const target = event.target;
         if (target.classList.contains('load-select-checkbox')) {
-            const loadId = parseInt(target.dataset.loadId, 10);
+            const loadId = target.dataset.loadId;
             const loadCard = target.closest('.load-card');
 
             if (target.checked) {
@@ -1098,26 +1098,25 @@ document.addEventListener('DOMContentLoaded', () => {
     modalPublishButton.addEventListener('click', async () => {
         const topicId = modalTopicSelect.value !== 'null' ? parseInt(modalTopicSelect.value, 10) : null;
         const topicName = modalTopicSelect.options[modalTopicSelect.selectedIndex].text;
+        const loadsToPublish = Array.from(selectedLoads, String);
 
-        if (!confirm(`Вы уверены, что хотите опубликовать ${selectedLoads.size} груз(ов) в топик "${topicName}"?`)) {
+        if (!confirm(`Вы уверены, что хотите опубликовать ${loadsToPublish.length} груз(ов) в топик "${topicName}"?`)) {
             return;
         }
 
         modalPublishButton.disabled = true;
         modalPublishButton.textContent = '⏳ Публикация...';
 
-        const loadsToPublish = Array.from(selectedLoads);
-        let successfulPublications = 0;
-        let failedPublications = 0;
+        try {
+            const result = await fetchWithAuth('/api/publish-loads', {
+                method: 'POST',
+                body: JSON.stringify({ loadIds: loadsToPublish, topicId })
+            });
 
-        for (const loadId of loadsToPublish) {
-            try {
-                await fetchWithAuth('/api/publish', {
-                    method: 'POST',
-                    body: JSON.stringify({ loadId, topicId })
-                });
-                successfulPublications++;
-                // Remove the load from the UI immediately
+            alert(result.message || 'Публикация завершена.');
+
+            // Remove published loads from the UI
+            loadsToPublish.forEach(loadId => {
                 const loadCard = document.querySelector(`.load-card[data-load-id="${loadId}"]`);
                 if (loadCard) {
                     loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
@@ -1128,21 +1127,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateCountsAfterAction(loadId);
                     }, 500);
                 }
-            } catch (error) {
-                failedPublications++;
-                console.error(`Ошибка при публикации груза ${loadId}:`, error);
-            }
-        }
+            });
 
-        alert(`Публикация завершена.\nУспешно опубликовано: ${successfulPublications}\nОшибок: ${failedPublications}`);
-        
-        hideBulkPublishModal();
-        selectedLoads.clear(); // Clear selected loads after bulk action
-        updateBulkButtonsState(); // Update button states
-        await loadPendingLoads(); // Refresh the list to ensure consistency
-        
-        modalPublishButton.disabled = false;
-        modalPublishButton.textContent = 'Опубликовать';
+        } catch (error) {
+            // Error is handled in fetchWithAuth
+        } finally {
+            hideBulkPublishModal();
+            selectedLoads.clear();
+            updateBulkButtonsState();
+            modalPublishButton.disabled = false;
+            modalPublishButton.textContent = 'Опубликовать';
+        }
     });
 
     bulkRejectButton.addEventListener('click', async () => {
@@ -1158,18 +1153,18 @@ document.addEventListener('DOMContentLoaded', () => {
         bulkRejectButton.disabled = true;
         bulkRejectButton.textContent = '⏳ Отклонение...';
 
-        const loadsToReject = Array.from(selectedLoads);
-        let successfulRejections = 0;
-        let failedRejections = 0;
+        const loadsToReject = Array.from(selectedLoads, String);
 
-        for (const loadId of loadsToReject) {
-            try {
-                await fetchWithAuth('/api/reject-load', {
-                    method: 'POST',
-                    body: JSON.stringify({ loadId })
-                });
-                successfulRejections++;
-                // Remove the load from the UI immediately
+        try {
+            const result = await fetchWithAuth('/api/reject-loads', {
+                method: 'POST',
+                body: JSON.stringify({ loadIds: loadsToReject })
+            });
+
+            alert(result.message || `Отклонение завершено. Успешно отклонено: ${loadsToReject.length}`);
+
+            // Remove rejected loads from the UI
+            loadsToReject.forEach(loadId => {
                 const loadCard = document.querySelector(`.load-card[data-load-id="${loadId}"]`);
                 if (loadCard) {
                     loadCard.style.transition = 'opacity 0.5s, transform 0.5s';
@@ -1180,19 +1175,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateCountsAfterAction(loadId);
                     }, 500);
                 }
-            } catch (error) {
-                failedRejections++;
-                console.error(`Ошибка при отклонении груза ${loadId}:`, error);
-            }
-        }
+            });
 
-        alert(`Отклонение завершено.\nУспешно отклонено: ${successfulRejections}\nОшибок: ${failedRejections}`);
-        
-        selectedLoads.clear(); // Clear selected loads after bulk action
-        updateBulkButtonsState(); // Update button states
-        await loadPendingLoads(); // Refresh the list to ensure consistency
-        
-        bulkRejectButton.disabled = false;
-        bulkRejectButton.textContent = '❌ Отклонить выбранные';
+        } catch (error) {
+            // Error is handled in fetchWithAuth, but we can add specific feedback here if needed
+        } finally {
+            selectedLoads.clear();
+            updateBulkButtonsState();
+            bulkRejectButton.disabled = false;
+            bulkRejectButton.textContent = '❌ Отклонить выбранные';
+        }
     });
 });
