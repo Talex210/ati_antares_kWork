@@ -459,6 +459,13 @@ body {
     transform: translateY(-2px);
 }
 
+.publish-btn:disabled, .reject-btn:disabled, .restore-btn:disabled, .delete-forever-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none; /* Remove hover animation when disabled */
+}
+
 /* Состояния загрузки */
 .loading {
     text-align: center;
