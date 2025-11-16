@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bulkPublishButton = document.getElementById('bulk-publish-button');
     const bulkRejectButton = document.getElementById('bulk-reject-button');
     const deselectContainer = document.getElementById('deselect-container');
-    const deselectCheckbox = document.getElementById('deselect-all-checkbox');
+    const deselectButton = document.getElementById('deselect-all-button');
 
     // Кэш контактов
     let contactsCache = null;
@@ -597,32 +597,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Обработчик для чекбокса "Снять все выделения"
-    if (deselectContainer) {
-        deselectContainer.addEventListener('click', (event) => {
-            // Снимаем все выделения
-            const loadsToDeselect = Array.from(selectedLoads);
-            
-            loadsToDeselect.forEach(loadId => {
-                const loadCheckbox = pendingLoadsList.querySelector(`.load-select-checkbox[data-load-id="${loadId}"]`);
-                if (loadCheckbox) {
-                    loadCheckbox.checked = false;
-                    selectedLoads.delete(loadId);
-                    const loadCard = loadCheckbox.closest('.load-card');
-                    if (loadCard) {
-                        loadCard.classList.remove('selected');
-                    }
-                }
-            });
-            
-            // Обновляем состояние кнопок и скрываем чекбокс
-            updateBulkButtonsState();
-            
-            // Убеждаемся что чекбокс не отмечен
-            if (deselectCheckbox) {
-                deselectCheckbox.checked = false;
-            }
-        });
-    }
+    deselectButton.addEventListener('click', () => {
+    // Снимаем выделение
+    selectedLoads.clear();
+
+    pendingLoadsList.querySelectorAll('.load-select-checkbox').forEach(cb => {
+        cb.checked = false;
+    });
+
+    pendingLoadsList.querySelectorAll('.load-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    updateBulkButtonsState();
+    });
+
 
     refreshLoadsButton.addEventListener('click', async () => {
         refreshLoadsButton.disabled = true;

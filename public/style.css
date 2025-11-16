@@ -313,10 +313,10 @@ body {
 }
 
 .load-card-checkbox {
+    height: 100%;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    padding-top: 2px;
 }
 
 .load-select-checkbox {
@@ -616,7 +616,7 @@ body {
     transform: translateY(-50%) rotate(-90deg);
 }
 
-/* --- Чекбокс снятия выделения (внизу по центру) --- */
+/* --- Кнопка снятия выделения (внизу по центру) --- */
 #deselect-container {
     position: fixed;
     bottom: 30px;
@@ -624,11 +624,7 @@ body {
     transform: translateX(-50%);
     z-index: 101;
     display: none;
-    background: white;
-    border: 2px solid #667eea;
-    border-radius: 10px;
     padding: 12px 24px;
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
     transition: all 0.3s ease;
     cursor: pointer;
     animation: slideUp 0.3s ease-out;
@@ -646,35 +642,30 @@ body {
 }
 
 #deselect-container:hover {
-    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
     transform: translateX(-50%) translateY(-3px);
-    background: #f8f9ff;
     border-color: #5568d3;
 }
 
 #deselect-container:active {
     transform: translateX(-50%) translateY(-1px);
-    box-shadow: 0 3px 15px rgba(102, 126, 234, 0.4);
 }
 
-#deselect-container label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    user-select: none;
-    font-weight: 500;
-    color: #333;
+#deselect-all-button {
+    border: none;
+    background: #A52A2A;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
     font-size: 15px;
-    margin: 0;
-    pointer-events: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.3s ease;
 }
 
-#deselect-container input {
-    cursor: pointer;
-    width: 20px;
-    height: 20px;
-    accent-color: #667eea;
-    margin: 0;
-    pointer-events: none;
+#deselect-all-button:hover {
+    background: #8B0000;
+}
+
+#deselect-all-button:active {
+    transform: scale(0.97);
 }
