@@ -26,6 +26,7 @@
                     <button class="tab-button active" data-tab="logisticians">👥 Управление логистами</button>
                     <button class="tab-button" data-tab="pending">📋 Грузы на публикацию</button>
                     <button class="tab-button" data-tab="rejected">🗑️ Отклоненные грузы</button>
+                    <button class="tab-button" data-tab="topics">💬 Управление топиками</button>
                 </nav>
             </div>
         </header>
@@ -107,6 +108,30 @@
                 
                 <div id="rejected-loads-list">
                     <p class="loading">Загрузка...</p>
+                </div>
+            </section>
+
+            <!-- Вкладка: Управление топиками -->
+            <section id="tab-topics" class="tab-content">
+                <div class="section-header">
+                    <h2>💬 Управление топиками</h2>
+                    <p class="section-description">Добавляйте, редактируйте и удаляйте топики для публикации грузов в Telegram.</p>
+                </div>
+                
+                <div class="add-form">
+                    <h3>➕ Добавить топик</h3>
+                    <div class="form-group">
+                        <input type="text" id="topic-name" placeholder="Название топика (например: Грузы Москва)" required>
+                        <input type="number" id="topic-id" placeholder="ID топика (например: 123)" required>
+                        <button id="add-topic-button" class="btn-primary">Добавить</button>
+                    </div>
+                </div>
+
+                <div class="list-container">
+                    <h3>📋 Список топиков</h3>
+                    <div id="topics-list">
+                        <p class="loading">Загрузка...</p>
+                    </div>
                 </div>
             </section>
         </main>

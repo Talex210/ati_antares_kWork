@@ -20,6 +20,11 @@ import {
   addRejectedLoads,
   removePendingLoads,
   markLoadsAsPublished,
+  Topic, // Добавляем импорт интерфейса Topic
+  addTopic, // Добавляем импорт функции addTopic
+  getTopics, // Добавляем импорт функции getTopics
+  updateTopic, // Добавляем импорт функции updateTopic
+  deleteTopic, // Добавляем импорт функции deleteTopic
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
@@ -192,6 +197,83 @@ export function createApiRouter(bot: TelegramBot) {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: 'Ошибка сервера при удалении логиста.' });
+    }
+  });
+
+  /**
+   * GET /api/topics
+   * Получает список всех топиков.
+   */
+  apiRouter.get('/topics', async (req: Request, res: Response) => {
+    try {
+      const topics = await getTopics();
+      res.json(topics);
+    } catch (error) {
+      res.status(500).json({ error: 'Ошибка сервера при получении списка топиков.' });
+    }
+  });
+
+  /**
+   * POST /api/topics
+   * Добавляет новый топик.
+   */
+  apiRouter.post('/topics', async (req: Request, res: Response) => {
+    const { name, topic_id } = req.body;
+    if (!name || !topic_id || typeof name !== 'string' || typeof topic_id !== 'number') {
+      return res.status(400).json({ error: 'Неверный формат данных. Ожидается { name: string, topic_id: number }.' });
+    }
+    try {
+      await addTopic(name, topic_id);
+      res.status(201).json({ message: 'Топик успешно добавлен.' });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Топик с таким ID уже существует.' });
+      }
+      res.status(500).json({ error: 'Ошибка сервера при добавлении топика.' });
+    }
+  });
+
+  /**
+   * PUT /api/topics/:id
+   * Обновляет существующий топик.
+   */
+  apiRouter.put('/topics/:id', async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    const { name, topic_id } = req.body;
+    if (isNaN(id) || !name || !topic_id || typeof name !== 'string' || typeof topic_id !== 'number') {
+      return res.status(400).json({ error: 'Неверный формат данных. Ожидается { id: number, name: string, topic_id: number }.' });
+    }
+    try {
+      await updateTopic(id, name, topic_id);
+      res.status(200).json({ message: 'Топик успешно обновлен.' });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('не найден')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Топик с таким ID уже существует.' });
+      }
+      res.status(500).json({ error: 'Ошибка сервера при обновлении топика.' });
+    }
+  });
+
+  /**
+   * DELETE /api/topics/:id
+   * Удаляет топик.
+   */
+  apiRouter.delete('/topics/:id', async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID должен быть числом.' });
+    }
+    try {
+      await deleteTopic(id);
+      res.status(200).json({ message: 'Топик успешно удален.' });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('не найден')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Ошибка сервера при удалении топика.' });
     }
   });
 

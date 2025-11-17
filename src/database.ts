@@ -65,6 +65,16 @@ export async function initializeDatabase() {
   `);
   console.log('Таблица "rejected_loads" готова.');
 
+  // Создаем таблицу для топиков
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS topics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      topic_id INTEGER NOT NULL UNIQUE
+    );
+  `);
+  console.log('Таблица "topics" готова.');
+
   return db;
 }
 
@@ -100,6 +110,103 @@ export interface WhitelistedLogistician {
   added_at: string;
 }
 
+/**
+ * Определяет тип для топика.
+ */
+export interface Topic {
+  id: number;
+  name: string;
+  topic_id: number;
+}
+
+/**
+ * Добавляет новый топик.
+ * @param name Название топика.
+ * @param topicId ID топика в Telegram.
+ */
+export async function addTopic(name: string, topicId: number): Promise<void> {
+  if (!db) {
+    throw new Error('База данных не инициализирована.');
+  }
+  try {
+    await db.run(
+      'INSERT INTO topics (name, topic_id) VALUES (?, ?)',
+      name,
+      topicId
+    );
+    console.log(`Топик "${name}" (ID: ${topicId}) добавлен.`);
+  } catch (error) {
+    console.error(`Ошибка при добавлении топика ${name}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Получает все топики.
+ * @returns {Promise<Topic[]>} Массив объектов топиков.
+ */
+export async function getTopics(): Promise<Topic[]> {
+  if (!db) {
+    console.error('База данных не инициализирована.');
+    return [];
+  }
+  try {
+    const topics = await db.all<Topic[]>(
+      'SELECT id, name, topic_id FROM topics ORDER BY name ASC'
+    );
+    return topics;
+  } catch (error) {
+    console.error('Ошибка при получении топиков:', error);
+    return [];
+  }
+}
+
+/**
+ * Обновляет существующий топик.
+ * @param id ID топика в базе данных.
+ * @param name Новое название топика.
+ * @param topicId Новый ID топика в Telegram.
+ */
+export async function updateTopic(id: number, name: string, topicId: number): Promise<void> {
+  if (!db) {
+    throw new Error('База данных не инициализирована.');
+  }
+  try {
+    const result = await db.run(
+      'UPDATE topics SET name = ?, topic_id = ? WHERE id = ?',
+      name,
+      topicId,
+      id
+    );
+    if (result.changes === 0) {
+      throw new Error(`Топик с ID ${id} не найден.`);
+    }
+    console.log(`Топик с ID ${id} обновлен: "${name}" (ID: ${topicId}).`);
+  } catch (error) {
+    console.error(`Ошибка при обновлении топика с ID ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Удаляет топик из базы данных.
+ * @param id ID топика в базе данных.
+ */
+export async function deleteTopic(id: number): Promise<void> {
+  if (!db) {
+    throw new Error('База данных не инициализирована.');
+  }
+  try {
+    const result = await db.run('DELETE FROM topics WHERE id = ?', id);
+    if (result.changes === 0) {
+      throw new Error(`Топик с ID ${id} не найден.`);
+    }
+    console.log(`Топик с ID ${id} удален.`);
+  } catch (error) {
+    console.error(`Ошибка при удалении топика с ID ${id}:`, error);
+    throw error;
+  }
+}
 
 /**
  * Получает полный список логистов из белого списка с информацией о контактах.

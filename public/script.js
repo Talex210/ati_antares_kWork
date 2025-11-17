@@ -24,6 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const rejectedLoadsList = document.getElementById('rejected-loads-list');
     const refreshRejectedButton = document.getElementById('refresh-rejected-button');
 
+    // Топики
+    const topicNameInput = document.getElementById('topic-name');
+    const topicIdInput = document.getElementById('topic-id');
+    const addTopicButton = document.getElementById('add-topic-button');
+    const topicsListContainer = document.getElementById('topics-list');
+
     // --- Bulk Selection ---
     const selectedLoads = new Set();
     const bulkActions = document.getElementById('bulk-actions');
@@ -41,20 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Кэш контактов
     let contactsCache = null;
 
-    // Глобальный массив топиков
-    const topics = [
-        { id: null, name: 'General' },
-        { id: 115, name: 'Загрузки вся РФ' },
-        { id: 107, name: 'Загрузки из Владивостока' },
-        { id: 105, name: 'Загрузки из Екатеринбурга' },
-        { id: 101, name: 'Загрузки из Казани' },
-        { id: 103, name: 'Загрузки из Москвы и МО' },
-        { id: 244, name: 'Загрузки из Набережных Челнов' },
-        { id: 113, name: 'Загрузки НЕГАБАРИТ' },
-        { id: 109, name: 'Загрузки из Самары' },
-        { id: 117, name: 'Курилка' },
-        { id: 111, name: 'Международные загрузки' }
-    ];
+    // Глобальный массив топиков (будет загружаться динамически)
+    let topics = [];
 
     // --- Tabs Management ---
     tabButtons.forEach(button => {
@@ -87,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadPendingLoads();
             } else if (tabName === 'rejected') {
                 loadRejectedLoads();
+            } else if (tabName === 'topics') {
+                loadTopics();
             }
         });
     });
@@ -327,6 +323,115 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             updateContactsButton.disabled = false;
             updateContactsButton.textContent = '🔄 Обновить контакты';
+        }
+    });
+
+    // --- Topics Management ---
+    async function loadTopics() {
+        topicsListContainer.innerHTML = '<p class="loading">Загрузка...</p>';
+        try {
+            const data = await fetchWithAuth('/api/topics');
+            topics = data; // Обновляем глобальный массив топиков
+            renderTopicsList(topics);
+        } catch (error) {
+            topicsListContainer.innerHTML = '<p style="color: red;">Не удалось загрузить список топиков.</p>';
+        }
+    }
+
+    function renderTopicsList(topicsToRender) {
+        if (!topicsToRender || topicsToRender.length === 0) {
+            topicsListContainer.innerHTML = '<p>Список топиков пуст.</p>';
+            return;
+        }
+        topicsListContainer.innerHTML = `
+            <ul class="styled-list">
+                ${topicsToRender.map(t => `
+                    <li>
+                        <div>
+                            <strong>${t.name}</strong> (ID: ${t.topic_id})
+                        </div>
+                        <div class="topic-actions">
+                            <button class="edit-topic-btn" data-id="${t.id}" data-name="${t.name}" data-topic-id="${t.topic_id}">✏️ Редактировать</button>
+                            <button class="delete-topic-btn" data-id="${t.id}">🗑️ Удалить</button>
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+
+    addTopicButton.addEventListener('click', async () => {
+        const name = topicNameInput.value.trim();
+        const topic_id = parseInt(topicIdInput.value.trim(), 10);
+
+        if (!name || isNaN(topic_id)) {
+            alert('Пожалуйста, введите название и корректный ID топика.');
+            return;
+        }
+
+        try {
+            addTopicButton.disabled = true;
+            addTopicButton.textContent = '⏳ Добавление...';
+
+            const result = await fetchWithAuth('/api/topics', {
+                method: 'POST',
+                body: JSON.stringify({ name, topic_id })
+            });
+            
+            topicNameInput.value = '';
+            topicIdInput.value = '';
+            
+            await loadTopics();
+            alert(result.message || 'Топик добавлен!');
+        } catch (error) {
+            // Error is handled in fetchWithAuth
+        } finally {
+            addTopicButton.textContent = 'Добавить';
+            addTopicButton.disabled = false;
+        }
+    });
+
+    topicsListContainer.addEventListener('click', async (event) => {
+        const target = event.target;
+        if (target.classList.contains('edit-topic-btn')) {
+            const id = parseInt(target.dataset.id, 10);
+            const name = target.dataset.name;
+            const topic_id = parseInt(target.dataset.topicId, 10);
+
+            const newName = prompt('Введите новое название топика:', name);
+            if (newName === null) return; // Отмена
+            const newTopicIdStr = prompt('Введите новый ID топика:', topic_id);
+            if (newTopicIdStr === null) return; // Отмена
+            const newTopicId = parseInt(newTopicIdStr, 10);
+
+            if (!newName.trim() || isNaN(newTopicId)) {
+                alert('Неверные данные. Название и ID топика обязательны.');
+                return;
+            }
+
+            try {
+                await fetchWithAuth(`/api/topics/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ name: newName, topic_id: newTopicId })
+                });
+                await loadTopics();
+                alert('Топик успешно обновлен!');
+            } catch (error) {
+                // Error is handled in fetchWithAuth
+            }
+        } else if (target.classList.contains('delete-topic-btn')) {
+            const id = parseInt(target.dataset.id, 10);
+            if (confirm('Вы уверены, что хотите удалить этот топик?')) {
+                try {
+                    await fetchWithAuth(`/api/topics/${id}`, {
+                        method: 'DELETE'
+                    });
+                    await loadTopics();
+                    alert('Топик успешно удален!');
+                } catch (error) {
+                    // Error is handled in fetchWithAuth
+                }
+            }
         }
     });
 
@@ -794,19 +899,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function createLoadCard(load, type, contacts = []) {
-        const topics = [
-            { id: null, name: 'General' },
-            { id: 115, name: 'Загрузки вся РФ' },
-            { id: 107, name: 'Загрузки из Владивостока' },
-            { id: 105, name: 'Загрузки из Екатеринбурга' },
-            { id: 101, name: 'Загрузки из Казани' },
-            { id: 103, name: 'Загрузки из Москвы и МО' },
-            { id: 244, name: 'Загрузки из Набережных Челнов' },
-            { id: 113, name: 'Загрузки НЕГАБАРИТ' },
-            { id: 109, name: 'Загрузки из Самары' },
-            { id: 117, name: 'Курилка' },
-            { id: 111, name: 'Международные загрузки' }
-        ];
+        // Глобальный массив топиков теперь используется
+        const availableTopics = topics;
 
         const dateStr = getDateString(load);
         const route = await getRoute(load);
@@ -826,7 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'pending') {
             actionsHTML = `
                 <select class="topic-select">
-                    ${topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+                    ${availableTopics.map(t => `<option value="${t.topic_id}">${t.name}</option>`).join('')}
                 </select>
                 <button class="publish-btn">⌯⌲ Опубликовать</button>
                 <button class="reject-btn">❌ Отклонить</button>
@@ -1078,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Modal Functions ---
     function populateModalTopicSelect() {
         modalTopicSelect.innerHTML = topics.map(t => 
-            `<option value="${t.id}">${t.name}</option>`
+            `<option value="${t.topic_id}">${t.name}</option>`
         ).join('');
     }
 
