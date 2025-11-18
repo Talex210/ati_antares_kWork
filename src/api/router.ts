@@ -28,7 +28,8 @@ import {
 } from '../database.js';
 import { formatLoadMessage } from '../core/format.js';
 import { Load } from '../core/types.js';
-import { deleteTelegramMessage, pollLoads } from '../bot.js';
+import { deleteTelegramMessage } from '../bot.js';
+import { runFullSync } from '../synchronizer.js';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -99,13 +100,13 @@ export function createApiRouter(bot: TelegramBot) {
     try {
       await addWhitelistedLogistician(ati_id, name);
       
-      // Запускаем пересканирование грузов в фоне
-      pollLoads().catch(error => {
-        console.error('❌ Ошибка при автоматическом пересканировании после добавления логиста:', error);
+      // Запускаем полную синхронизацию в фоне
+      runFullSync().catch(error => {
+        console.error('❌ Ошибка при автоматической синхронизации после добавления логиста:', error);
       });
       
       res.status(201).json({ 
-        message: 'Логист успешно добавлен. Запущено пересканирование грузов.' 
+        message: 'Логист успешно добавлен. Запущена полная синхронизация грузов.' 
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
@@ -154,13 +155,13 @@ export function createApiRouter(bot: TelegramBot) {
         telegram
       );
       
-      // Запускаем пересканирование грузов в фоне
-      pollLoads().catch(error => {
-        console.error('❌ Ошибка при автоматическом пересканировании после добавления логиста:', error);
+      // Запускаем полную синхронизацию в фоне
+      runFullSync().catch(error => {
+        console.error('❌ Ошибка при автоматической синхронизации после добавления логиста:', error);
       });
       
       res.status(201).json({ 
-        message: `Логист ${contact.name} успешно добавлен. Запущено пересканирование грузов.` 
+        message: `Логист ${contact.name} успешно добавлен. Запущена полная синхронизация грузов.` 
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
@@ -174,7 +175,7 @@ export function createApiRouter(bot: TelegramBot) {
   /**
    * DELETE /api/logisticians/:id
    * Удаляет логиста из белого списка по его ID в базе данных.
-   * После удаления автоматически пересканирует грузы (удаляет грузы этого логиста из очереди).
+   * После удаления автоматически запускает полную синхронизацию.
    */
   apiRouter.delete('/logisticians/:id', async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
@@ -184,13 +185,13 @@ export function createApiRouter(bot: TelegramBot) {
     try {
       await deleteWhitelistedLogistician(id);
       
-      // Запускаем пересканирование грузов в фоне
-      pollLoads().catch(error => {
-        console.error('❌ Ошибка при автоматическом пересканировании после удаления логиста:', error);
+      // Запускаем полную синхронизацию в фоне
+      runFullSync().catch(error => {
+        console.error('❌ Ошибка при автоматической синхронизации после удаления логиста:', error);
       });
       
       res.status(200).json({ 
-        message: 'Логист успешно удален. Запущено пересканирование грузов.' 
+        message: 'Логист успешно удален. Запущена полная синхронизация грузов.' 
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('не найден')) {
@@ -292,21 +293,21 @@ export function createApiRouter(bot: TelegramBot) {
 
   /**
    * POST /api/rescan-loads
-   * Принудительно запускает пересканирование грузов из ATI API.
+   * Принудительно запускает полную синхронизацию грузов.
    */
   apiRouter.post('/rescan-loads', async (req: Request, res: Response) => {
     try {
-      // Запускаем пересканирование в фоне
-      pollLoads().catch(error => {
-        console.error('❌ Ошибка при ручном пересканировании:', error);
+      // Запускаем полную синхронизацию в фоне
+      runFullSync().catch(error => {
+        console.error('❌ Ошибка при ручной полной синхронизации:', error);
       });
       
       res.status(200).json({ 
-        message: 'Пересканирование грузов запущено.' 
+        message: 'Полная синхронизация грузов запущена.' 
       });
     } catch (error) {
-      console.error('❌ Ошибка при запуске пересканирования:', error);
-      res.status(500).json({ error: 'Ошибка сервера при запуске пересканирования.' });
+      console.error('❌ Ошибка при запуске полной синхронизации:', error);
+      res.status(500).json({ error: 'Ошибка сервера при запуске синхронизации.' });
     }
   });
 
