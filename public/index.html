@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Админ-панель ATI</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚚</text></svg>">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,8 +24,8 @@
             <div class="header-content">
                 <h1>📦 Админ-панель ATI</h1>
                 <nav class="tabs">
-                    <button class="tab-button active" data-tab="logisticians">👥 Управление логистами</button>
-                    <button class="tab-button" data-tab="pending">📋 Грузы на публикацию</button>
+                    <button class="tab-button" data-tab="logisticians">👥 Управление логистами</button>
+                    <button class="tab-button active" data-tab="pending">📋 Грузы на публикацию</button>
                     <button class="tab-button" data-tab="rejected">🗑️ Отклоненные грузы</button>
                     <button class="tab-button" data-tab="topics">💬 Управление топиками</button>
                 </nav>
@@ -45,7 +46,7 @@
         <!-- Контент вкладок -->
         <main class="main-container">
             <!-- Вкладка: Управление логистами -->
-            <section id="tab-logisticians" class="tab-content active">
+            <section id="tab-logisticians" class="tab-content">
                 <div class="section-header">
                     <h2>👥 Управление логистами</h2>
                     <p class="section-description">Добавляйте и удаляйте логистов из белого списка</p>
@@ -78,7 +79,7 @@
             </section>
 
             <!-- Вкладка: Грузы на публикацию -->
-            <section id="tab-pending" class="tab-content">
+            <section id="tab-pending" class="tab-content active">
                 <div class="section-header">
                     <h2>📋 Грузы на публикацию</h2>
                     <button id="refresh-loads-button" class="btn-secondary">🔄 Обновить</button>
