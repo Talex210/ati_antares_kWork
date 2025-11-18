@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is a Node.js application that integrates with the ATI.SU API and a Telegram bot. The application automatically monitors the ATI.SU API for new loads, filters them based on a whitelist of logisticians, and adds them to a queue for publication. Administrators can manage logisticians, view pending loads, and publish them to different topics in a Telegram group through a web-based control panel.
+This project is a Node.js application that integrates with the ATI.SU API and a Telegram bot. The application automatically monitors the ATI.SU API for new loads, filters them based on a whitelist of logisticians, and adds them to a queue for publication. The application also performs a full synchronization, removing loads from the local database if they are no longer available in the ATI.SU API, ensuring data consistency. Administrators can manage logisticians, view pending loads, and publish them to different topics in a Telegram group through a web-based control panel.
 
 The backend is built with Node.js, TypeScript, and Express.js, using `node-telegram-bot-api` for Telegram integration and `sqlite3` for the database. The frontend is built with vanilla JavaScript, HTML, and CSS.
 
