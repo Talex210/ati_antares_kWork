@@ -139,8 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function showMainContent() {
         authSection.style.display = 'none';
         mainContent.style.display = 'block';
-        bulkActions.style.display = 'none'; // Hide on startup
-        loadLogisticians();
+        bulkActions.style.display = 'block'; // По умолчанию вкладка с грузами, так что показываем
+        loadTopics(); // Загружаем топики один раз при входе
+        loadPendingLoads(); // Загружаем грузы для вкладки по умолчанию
         updateBulkButtonsState();
     }
 
