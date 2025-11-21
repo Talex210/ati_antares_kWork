@@ -194,16 +194,27 @@ export const formatLoadMessage = async (load: Load): Promise<string> => {
   const currency = CURRENCIES[load.Payment?.CurrencyId || 1] || '₽';
   let priceStr = '💰 <b>Ставка:</b> ';
   
-  if (load.Payment?.RateSum) {
-    priceStr += `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
-  } else if (load.Payment?.SumWithoutNDS) {
-    priceStr += `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
+  const sumWithoutNDS = load.Payment?.SumWithoutNDS;
+  const sumWithNDS = load.Payment?.SumWithNDS;
+
+  let priceValue = '';
+
+  if (sumWithoutNDS && sumWithNDS && sumWithoutNDS !== sumWithNDS) {
+    priceValue = `${sumWithoutNDS.toLocaleString('ru-RU')} ${currency} (без НДС), ${sumWithNDS.toLocaleString('ru-RU')} ${currency} (с НДС)`;
+  } else if (sumWithoutNDS) {
+    priceValue = `${sumWithoutNDS.toLocaleString('ru-RU')} ${currency} (без НДС)`;
+  } else if (sumWithNDS) {
+    priceValue = `${sumWithNDS.toLocaleString('ru-RU')} ${currency} (с НДС)`;
+  } else if (load.Payment?.RateSum) {
+    priceValue = `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
   } else if (load.TruePrice) {
-    priceStr += `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
+    priceValue = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
   } else {
-    priceStr += 'По договоренности';
+    priceValue = 'По договоренности';
   }
   
+  priceStr += priceValue;
+
   // Торг
   if (load.Payment?.Torg) {
     priceStr += ' (торг)';

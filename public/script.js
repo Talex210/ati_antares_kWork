@@ -1122,10 +1122,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const currency = currencies[load.Payment?.CurrencyId] || '₽';
         
         let price = 'По договоренности';
-        if (load.Payment?.RateSum) {
+        const sumWithoutNDS = load.Payment?.SumWithoutNDS;
+        const sumWithNDS = load.Payment?.SumWithNDS;
+
+        if (sumWithoutNDS && sumWithNDS && sumWithoutNDS !== sumWithNDS) {
+            price = `${sumWithoutNDS.toLocaleString('ru-RU')} ${currency} (без НДС), ${sumWithNDS.toLocaleString('ru-RU')} ${currency} (с НДС)`;
+        } else if (sumWithoutNDS) {
+            price = `${sumWithoutNDS.toLocaleString('ru-RU')} ${currency} (без НДС)`;
+        } else if (sumWithNDS) {
+            price = `${sumWithNDS.toLocaleString('ru-RU')} ${currency} (с НДС)`;
+        } else if (load.Payment?.RateSum) {
             price = `${load.Payment.RateSum.toLocaleString('ru-RU')} ${currency}`;
-        } else if (load.Payment?.SumWithoutNDS) {
-            price = `${load.Payment.SumWithoutNDS.toLocaleString('ru-RU')} ${currency}`;
         } else if (load.TruePrice) {
             price = `${load.TruePrice.toLocaleString('ru-RU')} ${currency}`;
         }
